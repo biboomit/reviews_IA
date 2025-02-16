@@ -159,7 +159,7 @@ def fetch_all_reviews(app_id_android, country_android, app_name_ios, days=45):
             max_attempts = 5
 
             for attempt in range(max_attempts):
-                app_ios.review(how_many=500, after=fecha_inicio, sleep=0.4)
+                app_ios.review(how_many=400, after=fecha_inicio, sleep=0.7)
                 current_total = len(app_ios.reviews)
                 if current_total == total_reviews:
                     break
@@ -168,13 +168,19 @@ def fetch_all_reviews(app_id_android, country_android, app_name_ios, days=45):
             if not app_ios.reviews:
                 return pd.DataFrame()
 
-            df_reviews_ios = pd.DataFrame({
-                "at": pd.to_datetime(app_ios.reviews["date"]).dt.date,
-                "content": app_ios.reviews["review"],
-                "score": app_ios.reviews["rating"],
-                "source": "iOS"
-            })
+            # Crear DataFrame correctamente desde la lista de reseñas
+            df_reviews_ios = pd.DataFrame(app_ios.reviews)
+            
+            # Renombrar las columnas para que coincidan con las demás
+            if not df_reviews_ios.empty:
+                df_reviews_ios = df_reviews_ios.rename(columns={"date": "at", "review": "content", "rating": "score"})
+                df_reviews_ios["at"] = pd.to_datetime(df_reviews_ios["at"]).dt.date
+                df_reviews_ios["source"] = "iOS"
+            else:
+                df_reviews_ios = pd.DataFrame()
+
             return df_reviews_ios
+
         except Exception as e:
             st.error(f"⚠️ Error al obtener reseñas de iOS: {e}")
             return pd.DataFrame()
@@ -219,10 +225,6 @@ def fetch_all_reviews(app_id_android, country_android, app_name_ios, days=45):
     )
 
     return df_reviews
-
-
-
-
 
 def render_dynamic_kpis(df_filtered):
     """Renderiza KPIs dinámicos para calificaciones y cantidad de reseñas por fuente en 6 columnas."""
