@@ -271,14 +271,14 @@ if not df_reviews.empty:
     )
 
     st.markdown('<h4>🔎 Select the data source:</h4>', unsafe_allow_html=True)
-    source_filter = st.radio("", ["Todas", "Android", "iOS", "Web"], index=0, horizontal=True)
+    source_filter = st.radio("", ["All", "Android", "iOS"], index=0, horizontal=True)
 
     st.markdown('<h4>🔎 Select the app to analyze:</h4>', unsafe_allow_html=True)
     app_filter = st.radio("", [app1_name, app2_name], index=0, horizontal=True)
 
     df_filtered = df_reviews.copy()
 
-    if source_filter != 'Todas':
+    if source_filter != 'All':
         df_filtered = df_filtered[df_filtered["source"] == source_filter]
 
     if app_filter:
