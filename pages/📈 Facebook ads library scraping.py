@@ -411,7 +411,7 @@ def get_openai_insights(df_ads, OPENAI_API_KEY, ASSISTANT_ID):
 
 
 # Streamlit UI
-st.title("📢 Scraper de Anuncios en Meta")
+st.title("📢 Facebook Ads Analyzer")
 
 # Selección de país
 selected_country = st.selectbox("Selecciona un país", list(COUNTRY_MAP.keys()))
@@ -431,7 +431,9 @@ if "df_ads" in st.session_state and not st.session_state.df_ads.empty:
     df_ads["Start Date"] = pd.to_datetime(df_ads["Start Date"], errors='coerce')
     df_ads.to_excel('df_ads.xlsx', index=False)
 
-    st.success(f"Se encontraron {len(df_ads)} anuncios.")
+    #st.success(f"Se encontraron {len(df_ads)} anuncios.")
+    st.success("Anuncios Encontrados:")
+
 
     # Mostrar imágenes del Top 5 de mayor duración en una fila
     df_top_ads = df_ads.sort_values("Start Date").head(5)
@@ -449,7 +451,6 @@ if "df_ads" in st.session_state and not st.session_state.df_ads.empty:
         insights = get_openai_insights(df_ads, OPENAI_API_KEY, ASSISTANT_ID)
         st.subheader("📊 Insights Generados")
         st.write(insights)
-    else:
-        st.warning("No se encontraron anuncios para este anunciante.")
+
 
 
