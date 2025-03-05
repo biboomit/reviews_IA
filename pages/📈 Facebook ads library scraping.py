@@ -211,7 +211,7 @@ def clear_temp_images():
         except Exception as e:
             print(f"Error al eliminar {file_path}: {e}")
 
-@st.cache_data
+#@st.cache_data
 def extract_ads(country_code, domain):
     """Extrae anuncios desde la biblioteca de anuncios de Facebook"""
     
@@ -247,6 +247,11 @@ def extract_ads(country_code, domain):
             last_height = new_height
         
         ads = driver.find_elements(By.XPATH, "//div[contains(@class, '_7jvw x2izyaf x1hq5gj4 x1d52u69')]")
+        
+        for ad in ads:
+            span_elements = ad.find_elements(By.TAG_NAME, "span")
+            for span in span_elements:
+                print("SPAN TEXT:", span.text)
         
         for index, ad in enumerate(ads):
             try:
