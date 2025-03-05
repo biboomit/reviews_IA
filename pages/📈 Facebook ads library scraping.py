@@ -201,9 +201,22 @@ PLATFORM_MAP = {
 temp_dir = "temp_images"
 os.makedirs(temp_dir, exist_ok=True)
 
+def clear_temp_images():
+    """Elimina todas las imágenes en la carpeta temporal antes de guardar nuevas."""
+    for file in os.listdir(temp_dir):
+        file_path = os.path.join(temp_dir, file)
+        try:
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+        except Exception as e:
+            print(f"Error al eliminar {file_path}: {e}")
+
 @st.cache_data
 def extract_ads(country_code, domain):
     """Extrae anuncios desde la biblioteca de anuncios de Facebook"""
+    
+    # Limpiar imágenes previas
+    clear_temp_images()
     
     options = webdriver.ChromeOptions()
     options.add_argument("--incognito")
@@ -303,47 +316,6 @@ def extract_ads(country_code, domain):
     
     return pd.DataFrame(ads_data)
 
-
-
-# def get_openai_insights(df_ads, OPENAI_API_KEY, ASSISTANT_ID):
-#     """Generar insights usando OpenAI a partir del DataFrame de anuncios y sus imágenes."""
-#     try:
-#         client = openai.OpenAI(api_key=OPENAI_API_KEY)
-#         thread = client.beta.threads.create()
-        
-#         image_urls = df_ads["Image Path"].dropna().tolist()
-#         all_images = "\n".join(image_urls)  # Incluir todas las imágenes disponibles
-#         print(all_images)
-        
-#         prompt_text = """
-#         Analiza la estrategia de anuncios con la siguiente información:
-        
-#         - Total de anuncios detectados: {total_ads}
-#         - Distribución por plataforma:
-#         {platform_counts}
-#         - Textos de los anuncios:
-#         {ad_texts}
-#         - Imágenes de los anuncios:
-#         {all_images}
-#         """.format(
-#             total_ads=len(df_ads),
-#             platform_counts=df_ads[[col for col in PLATFORM_MAP.values()]].sum().to_dict(),
-#             ad_texts="\n".join(df_ads["Ad Text"].dropna().unique())[:2000],
-#             all_images=all_images
-#         )
-        
-#         client.beta.threads.messages.create(thread_id=thread.id, role="user", content=prompt_text)
-#         run = client.beta.threads.runs.create(thread_id=thread.id, assistant_id=ASSISTANT_ID)
-        
-#         with st.spinner("🔄 Generando insights, por favor espera..."):
-#             while run.status != "completed":
-#                 time.sleep(2)
-#                 run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
-        
-#         messages = client.beta.threads.messages.list(thread_id=thread.id)
-#         return messages.data[0].content[0].text.value
-#     except Exception as e:
-#         return f"Error al obtener insights de OpenAI: {e}"
 
 def fetch_images_from_urls(image_urls):
     """Descarga imágenes desde una lista de URLs y las convierte en Base64 para OpenAI."""
