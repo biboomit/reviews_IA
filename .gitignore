@@ -261,6 +261,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.streamlit
 env/
 venv/
 ENV/
