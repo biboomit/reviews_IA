@@ -406,6 +406,7 @@ if "df_ads" in st.session_state and not st.session_state.df_ads.empty:
     df_ads.to_excel('df_ads.xlsx', index=False)
 
     st.success(f"Se encontraron {len(df_ads)} anuncios.")
+    st.dataframe(df_ads)
 
     # Mostrar imágenes del Top 5 de mayor duración en una fila
     df_top_ads = df_ads.sort_values("Start Date").head(5)
