@@ -11,6 +11,7 @@ import openai
 from bs4 import BeautifulSoup
 import base64
 from app_store_scraper.app_store import AppStore 
+from datetime import datetime, timedelta
 
 # Cargar estilos CSS desde el archivo externo
 def load_css():
@@ -461,7 +462,10 @@ def fetch_all_reviews(app_id_android, country_android, app_name_ios, type_client
                 <div style="flex: 4;">
                     ✅ App Android: {app_name_ios} (ID: {app_id_android}) en {country_android} | Reseñas: {len(df_reviews_android)} <br>
                     ✅ App iOS: {app_name_ios} (ID: {ios_app_id if ios_app_id else 'No encontrado'}) en {country_android} | Reseñas: {len(df_reviews_ios)} <br>
+<<<<<<< HEAD
                     ✅ Google Maps Places: {places_ids if places_ids else 'No disponible'} | Reseñas: {len(df_reviews_maps)}
+=======
+>>>>>>> 67e2cd381a44aed80e38ddc81b8982ee08fbbae0
                 </div>
                 <div style="flex: 1; text-align: center;">
                     <img src="{app_logo}" alt="App Logo" style="max-width: 100px; max-height: 70px;">
