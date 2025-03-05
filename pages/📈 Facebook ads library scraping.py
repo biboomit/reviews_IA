@@ -152,9 +152,6 @@ if not st.session_state["authenticated"]:
     st.stop()
 
 
-# Obtén el directorio actual del script
-current_dir = os.path.dirname(os.path.abspath(__file__))
-
 # Define la ruta al chromedriver en la misma carpeta donde está el .py
 def get_chromedriver_path() -> str:
     return shutil.which('chromedriver')
