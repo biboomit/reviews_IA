@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import time
+import shutil
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -155,7 +156,11 @@ if not st.session_state["authenticated"]:
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Define la ruta al chromedriver en la misma carpeta donde está el .py
-CHROMEDRIVER_PATH = os.path.join(current_dir, 'chromedriver.exe')
+def get_chromedriver_path() -> str:
+    return shutil.which('chromedriver')
+
+#CHROMEDRIVER_PATH = os.path.join(current_dir, 'chromedriver.exe')
+CHROMEDRIVER_PATH = get_chromedriver_path()
 
 # Diccionario de países soportados
 COUNTRY_MAP = {
