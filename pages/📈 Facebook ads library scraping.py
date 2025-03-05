@@ -247,7 +247,7 @@ def extract_ads(country_code, domain):
             last_height = new_height
         
         ads = driver.find_elements(By.XPATH, "//div[contains(@class, '_7jvw x2izyaf x1hq5gj4 x1d52u69')]")
-        
+
         for ad in ads:
             span_elements = ad.find_elements(By.TAG_NAME, "span")
             for span in span_elements:
@@ -255,7 +255,9 @@ def extract_ads(country_code, domain):
         
         for index, ad in enumerate(ads):
             try:
-                ad_id = ad.find_element(By.XPATH, ".//span[contains(text(), 'Identificador de la biblioteca')]").text.replace("Identificador de la biblioteca: ", "").strip()
+                #ad_id = ad.find_element(By.XPATH, ".//span[contains(text(), 'Identificador de la biblioteca')]").text.replace("Identificador de la biblioteca: ", "").strip() #REEMPLAZAR ESTA PARTE PARA CORRER EN LOCAL
+                ad_id = ad.find_element(By.XPATH, ".//span[contains(text(), 'Library ID')]").text.replace("Library ID: ", "").strip() #webdriver en ingles
+                
             except NoSuchElementException:
                 ad_id = "No ID"
                 
@@ -272,7 +274,9 @@ def extract_ads(country_code, domain):
                 pass
             
             try:
-                start_date = ad.find_element(By.XPATH, ".//span[contains(text(), 'En circulación desde')]").text.replace("En circulación desde ", "").replace("el ", "").strip()
+                #start_date = ad.find_element(By.XPATH, ".//span[contains(text(), 'En circulación desde')]").text.replace("En circulación desde ", "").replace("el ", "").strip()
+                start_date = ad.find_element(By.XPATH, ".//span[contains(text(), 'Started running on')]").text.replace("Started running on ", "").replace("el ", "").strip()
+                
             except NoSuchElementException:
                 start_date = "No Date"
             
