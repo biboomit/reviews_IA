@@ -248,10 +248,10 @@ def extract_ads(country_code, domain):
         
         ads = driver.find_elements(By.XPATH, "//div[contains(@class, '_7jvw x2izyaf x1hq5gj4 x1d52u69')]")
 
-        for ad in ads:
-            span_elements = ad.find_elements(By.TAG_NAME, "span")
-            for span in span_elements:
-                print("SPAN TEXT:", span.text)
+        # for ad in ads:
+        #     span_elements = ad.find_elements(By.TAG_NAME, "span")
+        #     for span in span_elements:
+        #         print("SPAN TEXT:", span.text)
         
         for index, ad in enumerate(ads):
             try:
@@ -355,12 +355,36 @@ def get_openai_insights(df_ads, OPENAI_API_KEY, ASSISTANT_ID):
         image_urls = [url for url in df_ads["Image URL"].dropna().tolist() if url.startswith("http")]
         image_urls = image_urls[:9]  # Limitar a 9 imágenes para evitar errores de OpenAI
         
+        print(df_ads[[col for col in PLATFORM_MAP.values()]].sum().to_dict()) #mutear
+
         prompt_text = (
-            "Analiza la estrategia de anuncios considerando:\n\n"
-            f"- Total de anuncios detectados: {len(df_ads)}\n"
-            f"- Distribución por plataforma: {df_ads[[col for col in PLATFORM_MAP.values()]].sum().to_dict()}\n"
-            f"- Textos de los anuncios:\n{' '.join(df_ads['Ad Text'].dropna().unique())[:2000]}\n\n"
-            "Aquí tienes algunas imágenes de los anuncios. Analízalas y dime qué patrones visuales encuentras:"
+            "Analiza la estrategia de anuncios de un competidor en Meta Ads y proporciona insights relevantes "
+            "para identificar tácticas exitosas que puedan ser aprovechadas o adaptadas en nuestra estrategia publicitaria.\n\n"
+            f"📊 **Total de anuncios analizados:** {len(df_ads)}\n"
+            #f"📌 **Distribución de anuncios por plataforma:** {df_ads[[col for col in PLATFORM_MAP.values()]].sum().to_dict()}\n"
+            f"📝 **Ejemplo de textos utilizados en los anuncios más antiguos:**\n{' '.join(df_ads['Ad Text'].dropna().unique())[:2000]}\n\n"
+            
+            "🔍 **Objetivos del análisis:**\n"
+            "- ¿Cuáles son los principales enfoques en los textos publicitarios del competidor?\n"
+            "- ¿Qué tipo de mensajes y llamados a la acción están utilizando?\n"
+            "- ¿En qué plataformas están priorizando su inversión publicitaria?\n"
+            "- ¿Cómo varían sus anuncios según la plataforma utilizada?\n"
+            "- ¿Se observa un patrón en la duración de los anuncios más exitosos?\n"
+            "- ¿Se están repitiendo ciertos mensajes o hay una alta diversidad creativa?\n"
+            "- ¿Qué insights se pueden extraer para mejorar nuestra estrategia basándonos en estas observaciones?\n\n"
+            
+            "📸 **Análisis visual de los anuncios:**\n"
+            "- ¿Cuáles son los colores predominantes en los anuncios?\n"
+            "- ¿Los anuncios son más visuales o dependen del texto?\n"
+            "- ¿Se observan patrones en el estilo de diseño?\n"
+            "- ¿Los anuncios usan imágenes de productos, testimonios, ilustraciones u otros elementos gráficos?\n"
+            "- ¿Cómo se pueden adaptar estos elementos visuales a nuestra estrategia sin perder autenticidad?\n\n"
+            
+            "🎯 **Conclusión:**\n"
+            "- Basado en este análisis, ¿qué tácticas podríamos considerar incorporar en nuestra estrategia?\n"
+            "- ¿Qué aspectos parecen funcionar mejor en la estrategia del competidor?\n"
+            "- ¿Qué oportunidades o áreas de mejora podríamos explotar para diferenciarnos?\n"
+            "Aquí tienes algunas imágenes de los anuncios de la competencia. Analízalas y proporciona insights:"
         )
 
         # Crear mensaje con texto y las imágenes como `image_url`
@@ -413,7 +437,7 @@ if st.button("Search ads"):
 if "df_ads" in st.session_state and not st.session_state.df_ads.empty:
     df_ads = st.session_state.df_ads
     df_ads["Start Date"] = pd.to_datetime(df_ads["Start Date"], errors='coerce')
-    #df_ads.to_excel('df_ads.xlsx', index=False)
+    df_ads.to_excel('df_ads.xlsx', index=False)
 
     st.success(f"Ads found!")
     #st.dataframe(df_ads)
@@ -438,7 +462,6 @@ if "df_ads" in st.session_state and not st.session_state.df_ads.empty:
 
         output_placeholder.markdown("#### 📊 Insights Generated")
         output_placeholder.info(insights)
-    else:
-        st.warning("No ads found for this advertiser.")
+
 
 
