@@ -17,7 +17,7 @@ from io import BytesIO
 from PIL import Image
 import base64
 
-st.set_page_config(page_title="Boomit Ads Scraper", layout="wide")
+st.set_page_config(page_title="Facebook Ads Analyzer", layout="wide")
 
 logo_path = "company_logo.png"
 st.markdown(
@@ -380,7 +380,7 @@ def get_openai_insights(df_ads, OPENAI_API_KEY, ASSISTANT_ID):
             assistant_id=ASSISTANT_ID
         )
 
-        with st.spinner("🔄 Generando insights, por favor espera..."):
+        with st.spinner("🔄 Generating insights, please wait..."):
             while run.status != "completed":
                 time.sleep(2)
                 run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
@@ -390,36 +390,37 @@ def get_openai_insights(df_ads, OPENAI_API_KEY, ASSISTANT_ID):
 
         return messages.data[0].content[0].text.value
     except Exception as e:
-        return f"Error al obtener insights de OpenAI: {e}"
+        return f"Error retrieving insights from OpenAI: {e}"
 
 
 # Streamlit UI
-st.title("📢 Scraper de Anuncios en Meta")
+st.title("📢 Facebook Ads Analyzer")
 
 # Selección de país
-selected_country = st.selectbox("Selecciona un país", list(COUNTRY_MAP.keys()))
+selected_country = st.selectbox("Select a country", list(COUNTRY_MAP.keys()))
 country_code = COUNTRY_MAP[selected_country]
 
 # Campo para ingresar dominio
-advertiser_domain = st.text_input("Ingresa el dominio del anunciante", "alige.com.mx")
+advertiser_domain = st.text_input("Enter the advertiser's domain", "alige.com.mx")
 
 # Botón para iniciar scraping
-if st.button("Buscar Anuncios"):
-    df_ads = extract_ads(country_code, advertiser_domain)
-    st.session_state.df_ads = df_ads  # Guardar en session_state
+if st.button("Search ads"):
+    with st.spinner("🔄 Searching ads, please wait..."):
+        df_ads = extract_ads(country_code, advertiser_domain)
+        st.session_state.df_ads = df_ads  # Guardar en session_state
 
 # Verificar si hay datos almacenados en la sesión
 if "df_ads" in st.session_state and not st.session_state.df_ads.empty:
     df_ads = st.session_state.df_ads
     df_ads["Start Date"] = pd.to_datetime(df_ads["Start Date"], errors='coerce')
-    df_ads.to_excel('df_ads.xlsx', index=False)
+    #df_ads.to_excel('df_ads.xlsx', index=False)
 
-    st.success(f"Se encontraron {len(df_ads)} anuncios.")
-    st.dataframe(df_ads)
+    st.success(f"Ads found!")
+    #st.dataframe(df_ads)
 
     # Mostrar imágenes del Top 5 de mayor duración en una fila
     df_top_ads = df_ads.sort_values("Start Date").head(5)
-    st.subheader("🏆 Top 5 Anuncios")
+    st.subheader("🏆 Most valuable ads")
     col1, col2, col3, col4, col5 = st.columns(5)
 
     for col, (_, row) in zip([col1, col2, col3, col4, col5], df_top_ads.iterrows()):
@@ -429,11 +430,15 @@ if "df_ads" in st.session_state and not st.session_state.df_ads.empty:
     OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
     ASSISTANT_ID = st.secrets["ASSISTANT_ID"]
 
-    if st.button("💡 Generar Insights"):
+    if st.button("💡 Generate Insights"):
+
+        output_placeholder = st.empty()
+
         insights = get_openai_insights(df_ads, OPENAI_API_KEY, ASSISTANT_ID)
-        st.subheader("📊 Insights Generados")
-        st.write(insights)
+
+        output_placeholder.markdown("#### 📊 Insights Generated")
+        output_placeholder.info(insights)
     else:
-        st.warning("No se encontraron anuncios para este anunciante.")
+        st.warning("No ads found for this advertiser.")
 
 
