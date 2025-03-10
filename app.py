@@ -175,32 +175,35 @@ if not st.session_state["authenticated"]:
 # 🌍 Selección del país y apps
 # =========================
 country_mapping = {"Argentina": "ar", "Chile": "cl", "Colombia": "co", "Ecuador": "ec", "México": "mx"}
-col1, col2 = st.columns([2, 2])
+col1, col2, col3 = st.columns([2, 2, 2])
 with col1:
     selected_country = st.selectbox("🌍 Select the country:", list(country_mapping.keys()), key="selected_country")
 with col2:
     app1_name = st.text_input("🔎 Enter the main app:", key="app1_name")
+with col3:
     app2_name = st.text_input("🏆 Enter the competitor's app:", key="app2_name")
 
 country = country_mapping.get(selected_country)
 
 df_reviews = pd.DataFrame()
 
-# =========================
-# 🔄 Función para obtener reseñas
-# =========================
-def fetch_reviews(app_name, app_label, type_client):
-    app_id, app_data = fetch_app_data(app_name, country)
-    if app_id and app_data:
-        df = fetch_all_reviews(app_id, country, app_name, type_client, days=60)
-        df["app"] = app_label
-        return df, app_data.get("icon")
-    return pd.DataFrame(), None
+if st.button("🔍 Search reviews"):
+    with st.spinner("🔄 Searching reviews, please wait..."):
+        # =========================
+        # 🔄 Función para obtener reseñas
+        # =========================
+        def fetch_reviews(app_name, app_label, type_client):
+            app_id, app_data = fetch_app_data(app_name, country)
+            if app_id and app_data:
+                df = fetch_all_reviews(app_id, country, app_name, type_client, days=60)
+                df["app"] = app_label
+                return df, app_data.get("icon")
+            return pd.DataFrame(), None
 
 # =========================
 # 📥 Cargar reseñas de ambas apps con verificación de estado
 # =========================
-if app1_name and country:
+if app1_name or app2_name and country:
     if (
         "last_app1_name" not in st.session_state or
         "last_app2_name" not in st.session_state or
@@ -270,15 +273,15 @@ if not df_reviews.empty:
         unsafe_allow_html=True
     )
 
-    st.markdown('<h4>🔎 Select the data source:</h4>', unsafe_allow_html=True)
-    source_filter = st.radio("", ["Todas", "Android", "iOS", "Web"], index=0, horizontal=True)
+    st.markdown('<div style="margin-bottom: -80px;"><h4>🔎 Select the data source:</h4></div>', unsafe_allow_html=True)
+    source_filter = st.radio("", ["All", "Android", "iOS"], index=0, horizontal=True)
 
-    st.markdown('<h4>🔎 Select the app to analyze:</h4>', unsafe_allow_html=True)
+    st.markdown('<div style="margin-bottom: -80px;"><h4>🔎 Select the app to analyze:</h4></div>', unsafe_allow_html=True)
     app_filter = st.radio("", [app1_name, app2_name], index=0, horizontal=True)
 
     df_filtered = df_reviews.copy()
 
-    if source_filter != 'Todas':
+    if source_filter != 'All':
         df_filtered = df_filtered[df_filtered["source"] == source_filter]
 
     if app_filter:
@@ -313,7 +316,7 @@ if not df_reviews.empty:
         # =========================
         # 📊 SELECTOR DE NIVEL DE AGREGACIÓN ARRIBA DEL GRÁFICO
         # =========================
-        st.markdown('<div style="margin-bottom: -60px;"><h4>📊 Selecciona el nivel de agregación:</h4></div>', unsafe_allow_html=True)
+        st.markdown('<div style="margin-bottom: -80px;"><h4>📊 Selecciona el nivel de agregación:</h4></div>', unsafe_allow_html=True)
         agg_option = st.radio("", ["Daily", "Weekly", "Monthly", "Yearly"], index=1, horizontal=True)
 
         # Aplicar nivel de agregación seleccionado
@@ -364,137 +367,137 @@ if not df_reviews.empty:
         )
         st.plotly_chart(fig, use_container_width=True)
 
-        # =========================
-        # 🤖 ANÁLISIS CON OPENAI
-        # =========================
-        st.markdown("---")
-        st.markdown("### 🤖 Boomit One AI Analysis of Reviews")
+    # =========================
+    # 🤖 ANÁLISIS CON OPENAI
+    # =========================
+    st.markdown("---")
+    st.markdown("### 🤖 Boomit One AI Analysis of Reviews")
 
-        df_reviews_client = st.session_state.get("df_reviews_client", pd.DataFrame())
-        df_reviews_competitor = st.session_state.get("df_reviews_competitor", pd.DataFrame())
+    df_reviews_client = st.session_state.get("df_reviews_client", pd.DataFrame())
+    df_reviews_competitor = st.session_state.get("df_reviews_competitor", pd.DataFrame())
 
-        OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
-        ASSISTANT_ID = st.secrets["ASSISTANT_ID"]
-        openai.api_key = OPENAI_API_KEY
+    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+    ASSISTANT_ID = st.secrets["ASSISTANT_ID"]
+    openai.api_key = OPENAI_API_KEY
 
-        def get_openai_insights(prompt):
+    def get_openai_insights(prompt):
+        try:
+            client = openai.OpenAI(api_key=OPENAI_API_KEY)
+            thread = client.beta.threads.create()
+            client.beta.threads.messages.create(thread_id=thread.id, role="user", content=prompt)
+
+            run = client.beta.threads.runs.create(thread_id=thread.id, assistant_id=ASSISTANT_ID)
+
+            with st.spinner("🔄 Generating insights, please wait..."):
+                while run.status != "completed":
+                    time.sleep(2)
+                    run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
+
+            messages = client.beta.threads.messages.list(thread_id=thread.id)
+            return messages.data[0].content[0].text.value
+
+        except Exception as e:
+            return f"Error while fetching insights from OpenAI: {e}"
+
+    # Distribución horizontal clara de botones
+    col_buttons = st.columns(3)
+
+    # Placeholder único para los resultados
+    output_placeholder = st.empty()
+
+    with col_buttons[0]:
+        analisis_general_clicked = st.button("🔍 Reviews Analysis")
+
+    with col_buttons[1]:
+        recomendaciones_clicked = st.button("💡 Recommendations")
+
+    with col_buttons[2]:
+        analisis_competencia_clicked = st.button("📊 Competitor Analysis")
+
+    # Manejo del clic en los botones y mostrar resultado en la columna única
+    if analisis_general_clicked:
+        if not df_reviews_client.empty:
+            comments_text = "\n".join(df_reviews_client["content"].dropna().head(50).tolist()).strip()
+            prompt = f"Realiza un análisis general breve sobre estos comentarios, sin incluir recomendaciones:\n\n{comments_text}"
+            insights = get_openai_insights(prompt)
+            output_placeholder.markdown("#### 📌 Análisis General")
+            output_placeholder.info(insights)
+        else:
+            output_placeholder.warning("⚠️ No hay suficientes comentarios del cliente para analizar.")
+
+    elif recomendaciones_clicked:
+        if not df_reviews_client.empty:
+            comments_text = "\n".join(df_reviews_client["content"].dropna().head(50).tolist()).strip()
+            prompt = f"Dame recomendaciones concretas y accionables basadas en estos comentarios. No incluyas un análisis general:\n\n{comments_text}"
+            insights = get_openai_insights(prompt)
+            output_placeholder.markdown("#### 📌 Recomendaciones")
+            output_placeholder.info(insights)
+        else:
+            output_placeholder.warning("⚠️ No hay suficientes comentarios para generar recomendaciones.")
+
+    elif analisis_competencia_clicked:
+        if not df_reviews_client.empty and not df_reviews_competitor.empty:
+            comments_client = "\n".join(df_reviews_client["content"].dropna().head(50).tolist()).strip()
+            comments_competitor = "\n".join(df_reviews_competitor["content"].dropna().head(30).tolist()).strip()
+            prompt = (
+                "Realiza un análisis comparativo breve entre los siguientes comentarios del cliente y del competidor, "
+                "destacando fortalezas y debilidades clave:\n\n"
+                f"Cliente:\n{comments_client}\n\nCompetidor:\n{comments_competitor}"
+            )
+            insights = get_openai_insights(prompt)
+            output_placeholder.markdown("#### 📌 Análisis Competitivo")
+            output_placeholder.info(insights)
+        else:
+            output_placeholder.warning("⚠️ No hay suficientes comentarios del cliente o del competidor para realizar el análisis.")
+
+    st.markdown("---")
+    st.markdown("")
+
+    # **Histograma y Nube de Palabras**
+    if not df_filtered.empty:
+        col1, col2 = st.columns(2)
+
+        # Agregar columna para etiquetas de puntajes (estrellas)
+        df_filtered['score_label'] = df_filtered['score'].apply(lambda x: f'{int(x)}⭐')
+
+        with col1:
+            st.markdown("### 📊 Rating Distribution")
+            fig_hist = px.histogram(df_filtered, x='score_label', nbins=5, title="Rating Distribution", text_auto=True)
+            fig_hist.update_layout(
+                height=410,
+                bargap=0.1,
+                xaxis_title="Rating",
+                yaxis_title="Quantity",
+                margin=dict(l=40, r=40, t=60, b=40)
+            )
+            st.plotly_chart(fig_hist, use_container_width=True)
+
+        with col2:
+            st.markdown("### ☁️ Word cloud in reviews")
+            text = " ".join(str(review) for review in df_filtered["content"].dropna())
+
+            # Cargar stopwords desde el archivo stopwords.txt
+            stopwords = set()
             try:
-                client = openai.OpenAI(api_key=OPENAI_API_KEY)
-                thread = client.beta.threads.create()
-                client.beta.threads.messages.create(thread_id=thread.id, role="user", content=prompt)
-
-                run = client.beta.threads.runs.create(thread_id=thread.id, assistant_id=ASSISTANT_ID)
-
-                with st.spinner("🔄 Generating insights, please wait..."):
-                    while run.status != "completed":
-                        time.sleep(2)
-                        run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
-
-                messages = client.beta.threads.messages.list(thread_id=thread.id)
-                return messages.data[0].content[0].text.value
-
+                with open("stopwords.txt", "r", encoding="utf-8") as f:
+                    stopwords = set(line.strip() for line in f if line.strip())
+            except FileNotFoundError:
+                st.warning("⚠️ The file stopwords.txt was not found. The word cloud will be generated without custom stopwords.")
             except Exception as e:
-                return f"Error while fetching insights from OpenAI: {e}"
+                st.error(f"❌ An error occurred while loading the stopwords: {e}")
 
-        # Distribución horizontal clara de botones
-        col_buttons = st.columns(3)
+            if text:
+                wordcloud = WordCloud(
+                    width=800, height=450, background_color='white',
+                    stopwords=stopwords
+                ).generate(text)
 
-        # Placeholder único para los resultados
-        output_placeholder = st.empty()
-
-        with col_buttons[0]:
-            analisis_general_clicked = st.button("🔍 Reviews Analysis")
-
-        with col_buttons[1]:
-            recomendaciones_clicked = st.button("💡 Recommendations")
-
-        with col_buttons[2]:
-            analisis_competencia_clicked = st.button("📊 Competitor Analysis")
-
-        # Manejo del clic en los botones y mostrar resultado en la columna única
-        if analisis_general_clicked:
-            if not df_reviews_client.empty:
-                comments_text = "\n".join(df_reviews_client["content"].dropna().head(50).tolist()).strip()
-                prompt = f"Realiza un análisis general breve sobre estos comentarios, sin incluir recomendaciones:\n\n{comments_text}"
-                insights = get_openai_insights(prompt)
-                output_placeholder.markdown("#### 📌 Análisis General")
-                output_placeholder.info(insights)
+                fig, ax = plt.subplots(figsize=(10, 5))
+                ax.imshow(wordcloud, interpolation='bilinear')
+                ax.axis("off")
+                st.pyplot(fig)
             else:
-                output_placeholder.warning("⚠️ No hay suficientes comentarios del cliente para analizar.")
-
-        elif recomendaciones_clicked:
-            if not df_reviews_client.empty:
-                comments_text = "\n".join(df_reviews_client["content"].dropna().head(50).tolist()).strip()
-                prompt = f"Dame recomendaciones concretas y accionables basadas en estos comentarios. No incluyas un análisis general:\n\n{comments_text}"
-                insights = get_openai_insights(prompt)
-                output_placeholder.markdown("#### 📌 Recomendaciones")
-                output_placeholder.info(insights)
-            else:
-                output_placeholder.warning("⚠️ No hay suficientes comentarios para generar recomendaciones.")
-
-        elif analisis_competencia_clicked:
-            if not df_reviews_client.empty and not df_reviews_competitor.empty:
-                comments_client = "\n".join(df_reviews_client["content"].dropna().head(50).tolist()).strip()
-                comments_competitor = "\n".join(df_reviews_competitor["content"].dropna().head(30).tolist()).strip()
-                prompt = (
-                    "Realiza un análisis comparativo breve entre los siguientes comentarios del cliente y del competidor, "
-                    "destacando fortalezas y debilidades clave:\n\n"
-                    f"Cliente:\n{comments_client}\n\nCompetidor:\n{comments_competitor}"
-                )
-                insights = get_openai_insights(prompt)
-                output_placeholder.markdown("#### 📌 Análisis Competitivo")
-                output_placeholder.info(insights)
-            else:
-                output_placeholder.warning("⚠️ No hay suficientes comentarios del cliente o del competidor para realizar el análisis.")
-        
-        st.markdown("---")
-        st.markdown("")
-        
-        # **Histograma y Nube de Palabras**
-        if not df_filtered.empty:
-            col1, col2 = st.columns(2)
-
-            # Agregar columna para etiquetas de puntajes (estrellas)
-            df_filtered['score_label'] = df_filtered['score'].apply(lambda x: f'{int(x)}⭐')
-
-            with col1:
-                st.markdown("### 📊 Rating Distribution")
-                fig_hist = px.histogram(df_filtered, x='score_label', nbins=5, title="Rating Distribution", text_auto=True)
-                fig_hist.update_layout(
-                    height=410,
-                    bargap=0.1,
-                    xaxis_title="Rating",
-                    yaxis_title="Quantity",
-                    margin=dict(l=40, r=40, t=60, b=40)
-                )
-                st.plotly_chart(fig_hist, use_container_width=True)
-
-            with col2:
-                st.markdown("### ☁️ Word cloud in reviews")
-                text = " ".join(str(review) for review in df_filtered["content"].dropna())
-
-                # Cargar stopwords desde el archivo stopwords.txt
-                stopwords = set()
-                try:
-                    with open("stopwords.txt", "r", encoding="utf-8") as f:
-                        stopwords = set(line.strip() for line in f if line.strip())
-                except FileNotFoundError:
-                    st.warning("⚠️ The file stopwords.txt was not found. The word cloud will be generated without custom stopwords.")
-                except Exception as e:
-                    st.error(f"❌ An error occurred while loading the stopwords: {e}")
-
-                if text:
-                    wordcloud = WordCloud(
-                        width=800, height=450, background_color='white',
-                        stopwords=stopwords
-                    ).generate(text)
-
-                    fig, ax = plt.subplots(figsize=(10, 5))
-                    ax.imshow(wordcloud, interpolation='bilinear')
-                    ax.axis("off")
-                    st.pyplot(fig)
-                else:
-                    st.warning("⚠️ There is not enough data to generate a word cloud.")
+                st.warning("⚠️ There is not enough data to generate a word cloud.")
         # =========================
         # 🗂️ TABLA DE COMENTARIOS DINÁMICA
         # =========================
