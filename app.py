@@ -174,7 +174,14 @@ if not st.session_state["authenticated"]:
 # =========================
 # 🌍 Selección del país y apps
 # =========================
-country_mapping = {"Argentina": "ar", "Chile": "cl", "Colombia": "co", "Ecuador": "ec", "México": "mx"}
+country_mapping = {
+    "Argentina": "ar", "Belice": "bz", "Bolivia": "bo", "Brasil": "br", "Chile": "cl",
+    "Colombia": "co", "Costa Rica": "cr", "Cuba": "cu", "Ecuador": "ec",
+    "El Salvador": "sv", "Estados Unidos": "us", "Guatemala": "gt", "Honduras": "hn",
+    "México": "mx", "Nicaragua": "ni", "Panamá": "pa", "Paraguay": "py", "Perú": "pe",
+    "Puerto Rico": "pr", "República Dominicana": "do", "Uruguay": "uy", "Venezuela": "ve"
+}
+
 col1, col2, col3 = st.columns([2, 2, 2])
 with col1:
     selected_country = st.selectbox("🌍 Select the country:", list(country_mapping.keys()), key="selected_country")
