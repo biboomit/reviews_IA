@@ -161,34 +161,12 @@ CHROMEDRIVER_PATH = get_chromedriver_path()
 
 # Diccionario de países soportados
 COUNTRY_MAP = {
-    "Mexico": "MX",
-    "Argentina": "AR",
-    "Chile": "CL",
-    "Colombia": "CO",
-    "Ecuador": "EC",
-    "Peru": "PE",
-    "Uruguay": "UY",
-    "Paraguay": "PY",
-    "Bolivia": "BO",
-    "Venezuela": "VE",
-    "Brazil": "BR",
-    "United States": "US",
-    "Canada": "CA",
-    "Spain": "ES",
-    "France": "FR",
-    "Germany": "DE",
-    "Italy": "IT",
-    "United Kingdom": "GB",
-    "Australia": "AU",
-    "New Zealand": "NZ",
-    "Japan": "JP",
-    "China": "CN",
-    "India": "IN",
-    "South Korea": "KR",
-    "Russia": "RU",
-    "South Africa": "ZA"
+    "Argentina": "ar", "Belice": "bz", "Bolivia": "bo", "Brasil": "br", "Chile": "cl",
+    "Colombia": "co", "Costa Rica": "cr", "Cuba": "cu", "Ecuador": "ec",
+    "El Salvador": "sv", "Estados Unidos": "us", "Guatemala": "gt", "Honduras": "hn",
+    "México": "mx", "Nicaragua": "ni", "Panamá": "pa", "Paraguay": "py", "Perú": "pe",
+    "Puerto Rico": "pr", "República Dominicana": "do", "Uruguay": "uy", "Venezuela": "ve"
 }
-
 # Diccionario para identificar plataformas
 PLATFORM_MAP = {
     "-135px -351px": "Instagram",
