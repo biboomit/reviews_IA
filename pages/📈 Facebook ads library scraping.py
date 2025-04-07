@@ -8,6 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.keys import Keys
 from funciones import login
 import os
 import requests
@@ -16,6 +17,7 @@ import requests
 from io import BytesIO
 from PIL import Image
 import base64
+import re
 
 st.set_page_config(page_title="Facebook Ads Analyzer", layout="wide")
 
@@ -151,8 +153,6 @@ if not st.session_state["authenticated"]:
     login()
     st.stop()
 
-
-# Define la ruta al chromedriver en la misma carpeta donde está el .py
 def get_chromedriver_path() -> str:
     return shutil.which('chromedriver')
 
@@ -161,12 +161,13 @@ CHROMEDRIVER_PATH = get_chromedriver_path()
 
 # Diccionario de países soportados
 COUNTRY_MAP = {
-    "Argentina": "ar", "Belice": "bz", "Bolivia": "bo", "Brasil": "br", "Chile": "cl",
-    "Colombia": "co", "Costa Rica": "cr", "Cuba": "cu", "Ecuador": "ec",
-    "El Salvador": "sv", "Estados Unidos": "us", "Guatemala": "gt", "Honduras": "hn",
-    "México": "mx", "Nicaragua": "ni", "Panamá": "pa", "Paraguay": "py", "Perú": "pe",
-    "Puerto Rico": "pr", "República Dominicana": "do", "Uruguay": "uy", "Venezuela": "ve"
+    "Argentina": "AR", "Belice": "BZ", "Bolivia": "BO", "Brasil": "BR", "Chile": "CL",
+    "Colombia": "CO", "Costa Rica": "CR", "Cuba": "CU", "Ecuador": "EC",
+    "El Salvador": "SV", "Estados Unidos": "US", "Guatemala": "GT", "Honduras": "HN",
+    "México": "MX", "Nicaragua": "NI", "Panamá": "PA", "Paraguay": "PY", "Perú": "PE",
+    "Puerto Rico": "PR", "República Dominicana": "DO", "Uruguay": "UY", "Venezuela": "VE"
 }
+
 # Diccionario para identificar plataformas
 PLATFORM_MAP = {
     "-135px -351px": "Instagram",
@@ -189,8 +190,77 @@ def clear_temp_images():
         except Exception as e:
             print(f"Error al eliminar {file_path}: {e}")
 
-#@st.cache_data
-def extract_ads(country_code, domain):
+def get_advertiser_suggestions(country_code, domain):
+    """Extrae el texto y el logo de los elementos específicos de la clase"""
+    options = webdriver.ChromeOptions()
+    options.add_argument("--incognito")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--headless=new")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
+    
+    service = Service(CHROMEDRIVER_PATH)
+    driver = webdriver.Chrome(service=service, options=options)
+    
+    url = f"https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={country_code}&q={domain}&search_type=keyword_unordered&media_type=all"
+    driver.get(url)
+    
+    data = []
+    try:
+        WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+        
+        # Buscar y hacer clic en el campo de búsqueda para activar el dropdown
+        search_input = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, "//input[@type='search']"))
+        )
+        search_input.click()
+        
+        # Esperar a que aparezcan los resultados del dropdown
+        time.sleep(3)
+        
+        # Buscar los elementos li que contienen los resultados
+        advertiser_list_items = driver.find_elements(By.XPATH, "//li[@role='option']")
+        
+        for item in advertiser_list_items:
+            try:
+                # Extraer el ID de página del atributo id del li
+                li_id = item.get_attribute("id")
+                page_id = None
+                if li_id and "pageID:" in li_id:
+                    page_id = li_id.split("pageID:")[1].strip()
+                
+                # Extraer el nombre del anunciante
+                ad_text_element = item.find_element(By.XPATH, ".//div[@aria-level='3']")
+                ad_text = ad_text_element.text if ad_text_element else "Unknown Advertiser"
+                
+                # Extraer la URL del logo
+                logo_element = item.find_element(By.XPATH, ".//img[contains(@class, 'xz74otr')]")
+                logo_url = logo_element.get_attribute("src") if logo_element else None
+                
+                data.append({
+                    "name": ad_text, 
+                    "logo": logo_url,
+                    "page_id": page_id
+                })
+            except Exception as e:
+                print(f"Error extrayendo datos del elemento: {e}")
+                continue
+                
+    except Exception as e:
+        driver.save_screenshot("error_final.png")
+        return [f"Error: {str(e)}"]
+    finally:
+        driver.quit()
+    
+    return data
+
+
+
+def extract_ads(country_code, selected_advertiser):
     """Extrae anuncios desde la biblioteca de anuncios de Facebook"""
     
     # Limpiar imágenes previas
@@ -204,13 +274,31 @@ def extract_ads(country_code, domain):
     options.add_argument("--headless")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
+    options.add_argument("--lang=en-US")
+    options.add_argument("Accept-Language=en-US")
+
     
     service = Service(CHROMEDRIVER_PATH)
     driver = webdriver.Chrome(service=service, options=options)
     
-    url = f"https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={country_code}&q={domain}&search_type=keyword_unordered&media_type=all"
-    driver.get(url)
+    # Determina URL basada en el tipo de selected_advertiser
+    if isinstance(selected_advertiser, dict):
+        advertiser_name = selected_advertiser['name']
+        # Si tenemos page_id, usarlo para una búsqueda más precisa
+        if 'page_id' in selected_advertiser and selected_advertiser['page_id']:
+            url = f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country={country_code}&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id={selected_advertiser['page_id']}"
+        else:
+            url = f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country={country_code}&q={advertiser_name}&search_type=keyword_unordered&media_type=all"
+    else:
+        # Si es un string, usarlo directamente
+        url = f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country={country_code}&q={selected_advertiser}&search_type=keyword_unordered&media_type=all"
     
+    driver.get(url)
+    current_url = driver.current_url
+    if f"country={country_code}" not in current_url:
+        corrected_url = re.sub(r"country=\w\w", f"country={country_code}", current_url)
+        driver.get(corrected_url)
+
     ads_data = []
     try:
         WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
@@ -225,11 +313,6 @@ def extract_ads(country_code, domain):
             last_height = new_height
         
         ads = driver.find_elements(By.XPATH, "//div[contains(@class, '_7jvw x2izyaf x1hq5gj4 x1d52u69')]")
-
-        # for ad in ads:
-        #     span_elements = ad.find_elements(By.TAG_NAME, "span")
-        #     for span in span_elements:
-        #         print("SPAN TEXT:", span.text)
         
         for index, ad in enumerate(ads):
             try:
@@ -252,7 +335,6 @@ def extract_ads(country_code, domain):
                 pass
             
             try:
-                #start_date = ad.find_element(By.XPATH, ".//span[contains(text(), 'En circulación desde')]").text.replace("En circulación desde ", "").replace("el ", "").strip()
                 start_date = ad.find_element(By.XPATH, ".//span[contains(text(), 'Started running on')]").text.replace("Started running on ", "").replace("el ", "").strip()
                 
             except NoSuchElementException:
@@ -395,51 +477,124 @@ def get_openai_insights(df_ads, OPENAI_API_KEY, ASSISTANT_ID):
         return f"Error retrieving insights from OpenAI: {e}"
 
 
+# Inicializar session_state si no existe
+if 'advertisers' not in st.session_state:
+    st.session_state.advertisers = []
+if 'selected_advertiser' not in st.session_state:
+    st.session_state.selected_advertiser = None
+if 'df_ads' not in st.session_state:
+    st.session_state.df_ads = None
+if "selected_country" not in st.session_state:
+    st.session_state.selected_country = list(COUNTRY_MAP.keys())[0]  # default = Argentina
+
 # Streamlit UI
 st.title("📢 Facebook Ads Analyzer")
 
 # Selección de país
-selected_country = st.selectbox("Select a country", list(COUNTRY_MAP.keys()))
-country_code = COUNTRY_MAP[selected_country]
+selected_country = st.selectbox(
+    "Select a country",
+    list(COUNTRY_MAP.keys()),
+    index=list(COUNTRY_MAP.keys()).index(st.session_state.selected_country),
+    key="select_country_input"
+)
+if selected_country != st.session_state.selected_country:
+    st.session_state.selected_country = selected_country
 
-# Campo para ingresar dominio
-advertiser_domain = st.text_input("Enter the advertiser's domain", "alige.com.mx")
+# Usar siempre el valor del session_state
+country_code = COUNTRY_MAP[st.session_state.selected_country]
 
-# Botón para iniciar scraping
-if st.button("Search ads"):
-    with st.spinner("🔄 Searching ads, please wait..."):
-        df_ads = extract_ads(country_code, advertiser_domain)
-        st.session_state.df_ads = df_ads  # Guardar en session_state
+# Input para nombre del advertiser
+advertiser_name = st.text_input("Enter the advertiser's name", "")
 
-# Verificar si hay datos almacenados en la sesión
-if "df_ads" in st.session_state and not st.session_state.df_ads.empty:
+# Botón para buscar advertisers
+if st.button("Search advertiser"):
+    with st.spinner("🔄 Searching for advertisers..."):
+        try:
+            advertisers = get_advertiser_suggestions(country_code, advertiser_name)
+
+            if not advertisers or (isinstance(advertisers, list) and len(advertisers) == 1 and isinstance(advertisers[0], str) and advertisers[0].startswith("Error")):
+                st.error("🚫 No advertisers found. Try another keyword.")
+                st.stop()
+
+            st.session_state.advertisers = advertisers
+            st.session_state.selected_advertiser = None
+            st.session_state.df_ads = None
+            st.rerun()
+
+        except Exception as e:
+            st.error(f"❌ Error while searching advertisers: {str(e)}")
+            st.stop()
+
+# Mostrar dropdown si hay advertisers encontrados
+if st.session_state.advertisers:
+    advertiser_names = ["Select the desired advertiser..."] + [ad["name"] for ad in st.session_state.advertisers]
+
+    selected_name = st.selectbox(
+        "Select the desired advertiser",
+        advertiser_names,
+        index=0,
+        key="advertiser_dropdown"
+    )
+
+    if selected_name != "Select the desired advertiser...":
+        selected_advertiser = next(
+            (ad for ad in st.session_state.advertisers if ad["name"] == selected_name),
+            None
+        )
+
+        if selected_advertiser and (
+            st.session_state.selected_advertiser is None
+            or selected_advertiser["name"] != st.session_state.selected_advertiser["name"]
+        ):
+            st.session_state.selected_advertiser = selected_advertiser
+            st.session_state.df_ads = None
+            st.rerun()
+
+
+# Mostrar detalle del advertiser seleccionado
+if st.session_state.selected_advertiser:
+    st.image(st.session_state.selected_advertiser["logo"], width=80)
+
+    # Mostrar botón para buscar anuncios
+    if st.button("Search ads"):
+        with st.spinner(f"🔎 Extracting ads from {st.session_state.selected_advertiser['name']}..."):
+            try:
+                st.session_state.df_ads = extract_ads(country_code, st.session_state.selected_advertiser)
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Error while extracting ads: {str(e)}")
+                st.stop()
+
+# Mostrar resultados si hay anuncios extraídos
+if st.session_state.df_ads is not None and not st.session_state.df_ads.empty:
     df_ads = st.session_state.df_ads
-    df_ads["Start Date"] = pd.to_datetime(df_ads["Start Date"], errors='coerce')
+
+    if "Start Date" in df_ads.columns:
+        df_ads["Start Date"] = pd.to_datetime(df_ads["Start Date"], errors='coerce')
+
     df_ads.to_excel('df_ads.xlsx', index=False)
+    st.success("✅ Ads extracted successfully!")
 
-    st.success(f"Ads found!")
-    #st.dataframe(df_ads)
+    if len(df_ads) > 0 and "Start Date" in df_ads.columns and "Image Path" in df_ads.columns:
+        df_top_ads = df_ads.sort_values("Start Date").head(min(5, len(df_ads)))
+        st.subheader("🏆 Top Performing Ads")
+        columns = st.columns(min(5, len(df_top_ads)))
+        for col, (_, row) in zip(columns, df_top_ads.iterrows()):
+            if row["Image Path"] != "No Image" and os.path.exists(row["Image Path"]):
+                col.image(row["Image Path"], caption=row["Ad ID"], use_container_width=True)
 
-    # Mostrar imágenes del Top 5 de mayor duración en una fila
-    df_top_ads = df_ads.sort_values("Start Date").head(5)
-    st.subheader("🏆 Most valuable ads")
-    col1, col2, col3, col4, col5 = st.columns(5)
+    # OpenAI insights (si hay claves configuradas)
+    if "OPENAI_API_KEY" in st.secrets and "ASSISTANT_ID" in st.secrets:
+        OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+        ASSISTANT_ID = st.secrets["ASSISTANT_ID"]
 
-    for col, (_, row) in zip([col1, col2, col3, col4, col5], df_top_ads.iterrows()):
-        if row["Image Path"] != "No Image":
-            col.image(row["Image Path"], caption=row["Ad ID"], use_container_width=True)
-
-    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
-    ASSISTANT_ID = st.secrets["ASSISTANT_ID"]
-
-    if st.button("💡 Generate Insights"):
-
-        output_placeholder = st.empty()
-
-        insights = get_openai_insights(df_ads, OPENAI_API_KEY, ASSISTANT_ID)
-
-        output_placeholder.markdown("#### 📊 Insights Generated")
-        output_placeholder.info(insights)
-
+        if st.button("💡 Generate Insights"):
+            output_placeholder = st.empty()
+            output_placeholder.info("Generating insights, please wait...")
+            insights = get_openai_insights(df_ads, OPENAI_API_KEY, ASSISTANT_ID)
+            output_placeholder.markdown("#### 📊 Insights Generated")
+            output_placeholder.info(insights)
+    else:
+        st.warning("To generate insights, configure the API keys in Streamlit secrets.")
 
 
