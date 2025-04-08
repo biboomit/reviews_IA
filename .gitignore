@@ -261,7 +261,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
-.streamlit
+#.streamlit
 env/
 venv/
 ENV/
@@ -353,7 +353,7 @@ static/*.jpg
 static/*.jpeg
 
 # Ignorar archivos de configuración de Streamlit
-.streamlit/config.toml
+# .streamlit/config.toml
 .streamlit/secrets.toml
 
 # Ignorar archivos sensibles

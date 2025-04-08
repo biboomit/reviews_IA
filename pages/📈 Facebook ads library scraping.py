@@ -21,6 +21,11 @@ import re
 
 st.set_page_config(page_title="Facebook Ads Analyzer", layout="wide")
 
+with st.sidebar:
+    st.page_link('app.py', label='App reviews analyzer', icon='🔥')
+    st.page_link('pages/📈 Facebook ads library scraping.py', label='📈 Facebook ads library scraping')
+
+
 logo_path = "company_logo.png"
 st.markdown(
     f"""
