@@ -237,7 +237,7 @@ if app1_name or app2_name and country:
             country_android=country,
             app_name_ios=app1_name if app_id_ios else None,
             type_client='cliente',
-            days=60
+            days=90
         )
         df_reviews_client['app'] = app1_name
 
@@ -251,7 +251,7 @@ if app1_name or app2_name and country:
             country_android=country,
             app_name_ios=app2_name if app_id_ios else None,
             type_client='competidor',
-            days=60
+            days=90
         )
         df_reviews_competitor['app'] = app2_name
 
@@ -412,7 +412,7 @@ if not df_reviews.empty:
             return f"Error while fetching insights from OpenAI: {e}"
 
     # Distribución horizontal clara de botones
-    col_buttons = st.columns(3)
+    col_buttons = st.columns(4)
 
     # Placeholder único para los resultados
     output_placeholder = st.empty()
@@ -426,10 +426,13 @@ if not df_reviews.empty:
     with col_buttons[2]:
         analisis_competencia_clicked = st.button("📊 Competitor Analysis")
 
+    with col_buttons[3]:
+        analisis_reviews_recientes = st.button("📈 Recent reviews Analysis")
+
     # Manejo del clic en los botones y mostrar resultado en la columna única
     if analisis_general_clicked:
         if not df_reviews_client.empty:
-            comments_text = "\n".join(df_reviews_client["content"].dropna().head(50).tolist()).strip()
+            comments_text = "\n".join(df_reviews_client["content"].dropna().tolist()).strip()
             prompt = f"Realiza un análisis general breve sobre estos comentarios, sin incluir recomendaciones:\n\n{comments_text}"
             insights = get_openai_insights(prompt)
             output_placeholder.markdown("#### 📌 Análisis General")
@@ -439,7 +442,7 @@ if not df_reviews.empty:
 
     elif recomendaciones_clicked:
         if not df_reviews_client.empty:
-            comments_text = "\n".join(df_reviews_client["content"].dropna().head(50).tolist()).strip()
+            comments_text = "\n".join(df_reviews_client["content"].dropna().tolist()).strip()
             prompt = f"Dame recomendaciones concretas y accionables basadas en estos comentarios. No incluyas un análisis general:\n\n{comments_text}"
             insights = get_openai_insights(prompt)
             output_placeholder.markdown("#### 📌 Recomendaciones")
@@ -461,6 +464,46 @@ if not df_reviews.empty:
             output_placeholder.info(insights)
         else:
             output_placeholder.warning("⚠️ No hay suficientes comentarios del cliente o del competidor para realizar el análisis.")
+
+    elif analisis_reviews_recientes:
+        if not df_reviews_client.empty:
+            # Asegurarse de que la columna 'at' sea datetime
+            df_reviews_client["at"] = pd.to_datetime(df_reviews_client["at"])
+
+            # Filtrar por los últimos 90 días
+            fecha_actual = datetime.now()
+            hace_90_dias = fecha_actual - timedelta(days=90)
+            df_ultimos_90 = df_reviews_client[df_reviews_client["at"] >= hace_90_dias]
+
+            if df_ultimos_90.empty:
+                output_placeholder.warning("⚠️ No hay suficientes comentarios en los últimos 90 días para generar recomendaciones.")
+            else:
+                # Dividir entre últimos 30 días y los 60 anteriores
+                hace_30_dias = fecha_actual - timedelta(days=30)
+                df_ultimos_30 = df_ultimos_90[df_ultimos_90["at"] >= hace_30_dias]
+                df_anteriores_60 = df_ultimos_90[
+                    (df_ultimos_90["at"] < hace_30_dias)
+                ]
+
+                comentarios_ultimos_30 = "\n".join(df_ultimos_30["content"].dropna().tolist()).strip()
+                comentarios_anteriores_60 = "\n".join(df_anteriores_60["content"].dropna().tolist()).strip()
+
+                prompt = (
+                    "Quiero que analices los comentarios de una app móviles divididos en dos períodos:\n\n"
+                    "1. **Últimos 30 días**:\n"
+                    f"{comentarios_ultimos_30}\n\n"
+                    "2. **60 días anteriores a ese período**:\n"
+                    f"{comentarios_anteriores_60}\n\n"
+                    "Con base en esta comparación, dame principalmente insights sobre que cambios impactaron en la percepcion del usuario sobre la app, ya sea una evolucion positiva o negativa. Tambien dame recomendaciones **concretas y accionables** que reflejen los cambios en el feedback reciente. "
+                    "No incluyas un análisis general. Resalta oportunidades de mejora o problemas nuevos que hayan surgido."
+                )
+
+                insights = get_openai_insights(prompt)
+                output_placeholder.markdown("#### 📌 Recomendaciones")
+                output_placeholder.info(insights)
+        else:
+            output_placeholder.warning("⚠️ No hay suficientes comentarios para generar recomendaciones.")
+
 
     st.markdown("---")
     st.markdown("")
