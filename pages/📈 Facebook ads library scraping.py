@@ -410,76 +410,160 @@ def fetch_images_from_urls(image_urls):
     return images_base64
 
 
-def get_openai_insights(df_ads, OPENAI_API_KEY, ASSISTANT_ID):
-    """Generar insights usando OpenAI con imágenes y datos de anuncios."""
+# def get_openai_insights(df_ads, OPENAI_API_KEY, ASSISTANT_ID):
+#     """Generar insights usando OpenAI con imágenes y datos de anuncios."""
+#     try:
+#         client = openai.OpenAI(api_key=OPENAI_API_KEY)
+#         thread = client.beta.threads.create()
+        
+#         # Extraer URLs válidas de imágenes (solo URLs públicas)
+#         image_urls = [url for url in df_ads["Image URL"].dropna().tolist() if url.startswith("http")]
+#         image_urls = image_urls[:9]  # Limitar a 9 imágenes para evitar errores de OpenAI
+        
+#         print(df_ads[[col for col in PLATFORM_MAP.values()]].sum().to_dict()) #mutear
+
+#         prompt_text = (
+#             "Analiza la estrategia de anuncios de un competidor en Meta Ads y proporciona insights relevantes "
+#             "para identificar tácticas exitosas que puedan ser aprovechadas o adaptadas en nuestra estrategia publicitaria.\n\n"
+#             f"📊 **Total de anuncios analizados:** {len(df_ads)}\n"
+#             #f"📌 **Distribución de anuncios por plataforma:** {df_ads[[col for col in PLATFORM_MAP.values()]].sum().to_dict()}\n"
+#             f"📝 **Ejemplo de textos utilizados en los anuncios más antiguos:**\n{' '.join(df_ads['Ad Text'].dropna().unique())[:2000]}\n\n"
+            
+#             "🔍 **Objetivos del análisis:**\n"
+#             "- ¿Cuáles son los principales enfoques en los textos publicitarios del competidor?\n"
+#             "- ¿Qué tipo de mensajes y llamados a la acción están utilizando?\n"
+#             "- ¿En qué plataformas están priorizando su inversión publicitaria?\n"
+#             "- ¿Cómo varían sus anuncios según la plataforma utilizada?\n"
+#             "- ¿Se observa un patrón en la duración de los anuncios más exitosos?\n"
+#             "- ¿Se están repitiendo ciertos mensajes o hay una alta diversidad creativa?\n"
+#             "- ¿Qué insights se pueden extraer para mejorar nuestra estrategia basándonos en estas observaciones?\n\n"
+            
+#             "📸 **Análisis visual de los anuncios:**\n"
+#             "- ¿Cuáles son los colores predominantes en los anuncios?\n"
+#             "- ¿Los anuncios son más visuales o dependen del texto?\n"
+#             "- ¿Se observan patrones en el estilo de diseño?\n"
+#             "- ¿Los anuncios usan imágenes de productos, testimonios, ilustraciones u otros elementos gráficos?\n"
+#             "- ¿Cómo se pueden adaptar estos elementos visuales a nuestra estrategia sin perder autenticidad?\n\n"
+            
+#             "🎯 **Conclusión:**\n"
+#             "- Basado en este análisis, ¿qué tácticas podríamos considerar incorporar en nuestra estrategia?\n"
+#             "- ¿Qué aspectos parecen funcionar mejor en la estrategia del competidor?\n"
+#             "- ¿Qué oportunidades o áreas de mejora podríamos explotar para diferenciarnos?\n"
+#             "Aquí tienes algunas imágenes de los anuncios de la competencia. Analízalas y proporciona insights:"
+#         )
+
+#         # Crear mensaje con texto y las imágenes como `image_url`
+#         message_content = [{"type": "text", "text": prompt_text}]
+#         message_content += [{"type": "image_url", "image_url": {"url": url}} for url in image_urls]
+
+#         # Enviar solicitud al assistant
+#         client.beta.threads.messages.create(
+#             thread_id=thread.id,
+#             role="user",
+#             content=message_content
+#         )
+        
+#         # Ejecutar la solicitud
+#         run = client.beta.threads.runs.create(
+#             thread_id=thread.id,
+#             assistant_id=ASSISTANT_ID
+#         )
+
+#         with st.spinner("🔄 Generating insights, please wait..."):
+#             while run.status != "completed":
+#                 time.sleep(2)
+#                 run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
+        
+#         # Obtener la respuesta
+#         messages = client.beta.threads.messages.list(thread_id=thread.id)
+
+#         return messages.data[0].content[0].text.value
+#     except Exception as e:
+#         return f"Error retrieving insights from OpenAI: {e}"
+
+def get_openai_insights_and_images(df_ads, OPENAI_API_KEY, ASSISTANT_ID):
+    """Generar insights y propuestas creativas + imágenes nuevas usando OpenAI y DALL·E."""
     try:
+        import openai
+        import time
+        import streamlit as st
+        import re
+
         client = openai.OpenAI(api_key=OPENAI_API_KEY)
         thread = client.beta.threads.create()
-        
-        # Extraer URLs válidas de imágenes (solo URLs públicas)
-        image_urls = [url for url in df_ads["Image URL"].dropna().tolist() if url.startswith("http")]
-        image_urls = image_urls[:9]  # Limitar a 9 imágenes para evitar errores de OpenAI
-        
-        print(df_ads[[col for col in PLATFORM_MAP.values()]].sum().to_dict()) #mutear
 
+        # Extraer imágenes del competidor
+        image_urls = [url for url in df_ads["Image URL"].dropna().tolist() if url.startswith("http")]
+        image_urls = image_urls[:9]
+
+        # Prompt para insights y creatividad
         prompt_text = (
-            "Analiza la estrategia de anuncios de un competidor en Meta Ads y proporciona insights relevantes "
-            "para identificar tácticas exitosas que puedan ser aprovechadas o adaptadas en nuestra estrategia publicitaria.\n\n"
-            f"📊 **Total de anuncios analizados:** {len(df_ads)}\n"
-            #f"📌 **Distribución de anuncios por plataforma:** {df_ads[[col for col in PLATFORM_MAP.values()]].sum().to_dict()}\n"
-            f"📝 **Ejemplo de textos utilizados en los anuncios más antiguos:**\n{' '.join(df_ads['Ad Text'].dropna().unique())[:2000]}\n\n"
-            
-            "🔍 **Objetivos del análisis:**\n"
-            "- ¿Cuáles son los principales enfoques en los textos publicitarios del competidor?\n"
-            "- ¿Qué tipo de mensajes y llamados a la acción están utilizando?\n"
-            "- ¿En qué plataformas están priorizando su inversión publicitaria?\n"
-            "- ¿Cómo varían sus anuncios según la plataforma utilizada?\n"
-            "- ¿Se observa un patrón en la duración de los anuncios más exitosos?\n"
-            "- ¿Se están repitiendo ciertos mensajes o hay una alta diversidad creativa?\n"
-            "- ¿Qué insights se pueden extraer para mejorar nuestra estrategia basándonos en estas observaciones?\n\n"
-            
-            "📸 **Análisis visual de los anuncios:**\n"
-            "- ¿Cuáles son los colores predominantes en los anuncios?\n"
-            "- ¿Los anuncios son más visuales o dependen del texto?\n"
-            "- ¿Se observan patrones en el estilo de diseño?\n"
-            "- ¿Los anuncios usan imágenes de productos, testimonios, ilustraciones u otros elementos gráficos?\n"
-            "- ¿Cómo se pueden adaptar estos elementos visuales a nuestra estrategia sin perder autenticidad?\n\n"
-            
-            "🎯 **Conclusión:**\n"
-            "- Basado en este análisis, ¿qué tácticas podríamos considerar incorporar en nuestra estrategia?\n"
-            "- ¿Qué aspectos parecen funcionar mejor en la estrategia del competidor?\n"
-            "- ¿Qué oportunidades o áreas de mejora podríamos explotar para diferenciarnos?\n"
-            "Aquí tienes algunas imágenes de los anuncios de la competencia. Analízalas y proporciona insights:"
+            "Eres un experto en creatividad publicitaria. Analiza estos anuncios de un competidor "
+            "y genera insights + propuestas visuales creativas superadoras.\n\n"
+            f"📊 Total anuncios: {len(df_ads)}\n"
+            f"📝 Textos ejemplo:\n{' '.join(df_ads['Ad Text'].dropna().unique())[:2000]}\n\n"
+            "🔍 Da insights sobre estilo, tono, plataformas, patrones visuales y mensajes.\n\n"
+            "🎨 Luego propone 3 ideas creativas nuevas para anuncios disruptivos.\n"
+            "- Describe visualmente cómo deberían verse.\n"
+            "- Menciona colores, estilo gráfico, emociones, elementos visuales y CTA.\n"
+            "- Ejemplo de formato deseado:\n"
+            "1. Una imagen que combine tonos cálidos y una pareja feliz comiendo sushi en un entorno moderno...\n"
         )
 
-        # Crear mensaje con texto y las imágenes como `image_url`
         message_content = [{"type": "text", "text": prompt_text}]
         message_content += [{"type": "image_url", "image_url": {"url": url}} for url in image_urls]
 
-        # Enviar solicitud al assistant
+        # Enviar y correr análisis
         client.beta.threads.messages.create(
             thread_id=thread.id,
             role="user",
             content=message_content
         )
-        
-        # Ejecutar la solicitud
+
         run = client.beta.threads.runs.create(
             thread_id=thread.id,
             assistant_id=ASSISTANT_ID
         )
 
-        with st.spinner("🔄 Generating insights, please wait..."):
+        with st.spinner("🔄 Analizando anuncios y generando propuestas..."):
             while run.status != "completed":
                 time.sleep(2)
                 run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
-        
-        # Obtener la respuesta
-        messages = client.beta.threads.messages.list(thread_id=thread.id)
 
-        return messages.data[0].content[0].text.value
+        # Obtener respuesta de texto
+        messages = client.beta.threads.messages.list(thread_id=thread.id)
+        full_text = messages.data[0].content[0].text.value
+
+        # 🎯 Extraer prompts creativos para imágenes
+        idea_prompts = re.findall(r"\d+\.\s+(.*)", full_text)
+        idea_prompts = [p for p in idea_prompts if len(p.split()) > 5][:3]  # tomar solo ideas bien descriptas
+
+        st.markdown("### 💡 Ideas creativas propuestas:")
+        for i, prompt in enumerate(idea_prompts, 1):
+            st.markdown(f"**{i}.** {prompt}")
+
+        # 🎨 Generar imágenes con DALL·E
+        image_responses = []
+        st.markdown("### 🖼️ Imágenes generadas:")
+        for prompt in idea_prompts:
+            image = client.images.generate(
+                model="dall-e-3",
+                prompt=prompt,
+                n=1,
+                size="1024x1024"
+            )
+            image_url = image.data[0].url
+            st.image(image_url, caption=prompt)
+            image_responses.append({"prompt": prompt, "url": image_url})
+
+        return {
+            "insights_text": full_text,
+            "creative_images": image_responses
+        }
+
     except Exception as e:
-        return f"Error retrieving insights from OpenAI: {e}"
+        return f"Error durante el análisis y generación de imágenes: {e}"
+
 
 
 # Inicializar session_state si no existe
@@ -596,7 +680,7 @@ if st.session_state.df_ads is not None and not st.session_state.df_ads.empty:
         if st.button("💡 Generate Insights"):
             output_placeholder = st.empty()
             output_placeholder.info("Generating insights, please wait...")
-            insights = get_openai_insights(df_ads, OPENAI_API_KEY, ASSISTANT_ID)
+            insights = get_openai_insights_and_images(df_ads, OPENAI_API_KEY, ASSISTANT_ID)
             output_placeholder.markdown("#### 📊 Insights Generated")
             output_placeholder.info(insights)
     else:
