@@ -448,7 +448,7 @@ def extract_ads(country_code, selected_advertiser):
                 break
             last_height = new_height
         
-        ads = driver.find_elements(By.XPATH, "//div[contains(@class, '_7jvw x2izyaf x1hq5gj4 x1d52u69')]")
+        ads = driver.find_elements(By.XPATH, "//div[contains(@class, 'x1plvlek xryxfnj x1gzqxud x178xt8z')]")
         
         for index, ad in enumerate(ads):
             try:
@@ -551,468 +551,263 @@ def save_uploaded_file(uploaded_file, directory, filename=None):
         return filepath
     return None
 
-def extract_ad_proposals(full_text):
+
+def generate_prompt_1_gpt4o(brand_name, product_description, primary_color, secondary_color,
+                            brand_tone, ad_objective, cta, own_ads_description, competitor_ads_description):
     """
-    Extrae específicamente las propuestas de anuncios del texto completo de insights.
-    Busca bloques que comiencen con "Anuncio X:" y contienen secciones Visual y Texto Publicitario.
-    Versión mejorada con debugging.
+    Genera el prompt estructurado para GPT-4o, instruyéndolo a fusionar elementos visuales
+    de los anuncios propios y de la competencia, incluyendo análisis tipográfico.
     """
+    prompt = f"""
+Quiero que actúes como un director de arte senior especializado en anuncios de performance para productos digitales.
+
+Tu tarea tiene cuatro partes:
+
+---
+
+🧠 **Parte 1: Insights generales**
+- Analizá visualmente los anuncios proporcionados de la competencia y de la marca.
+- Identificá estilos fotográficos, encuadres, colores, tono emocional y composición más efectivos.
+- Describí brevemente el estilo y enfoque visual que debería mantenerse o evolucionar.
+
+---
+
+🖋️ **Parte 2: Análisis de texto en imágenes de referencia**
+- Observá el texto presente en las imágenes de referencia aportadas (tanto de marca como de competencia).
+- Describí ubicación, tamaño relativo, tipo de fuente (serif, sans-serif, script, display), estilo de fuente (negrita, cursiva), color (código hexadecimal o aproximado) y contraste.
+- Especificá la posición exacta o relativa (ejemplo: esquina superior derecha, centrado inferior) y cualquier margen o espacio con otros elementos.
+- Generá una propuesta de cómo debería replicarse o evolucionar este texto en el nuevo anuncio.
+
+---
+
+🖼️ **Parte 3: Fusión de inspiración visual**
+- Tomá como referencia las imágenes que te envío (ads propios y de la competencia).
+- Fusioná los puntos fuertes de ambas referencias:
+    - Del ad de la **marca**: transmití el contexto emocional, el entorno realista, el uso del producto.
+    - Del ad de la **competencia**: usá su estilo fotográfico profesional, iluminación, ritmo visual y estética moderna.
+- Generá una imagen nueva que represente esta combinación, optimizada para campañas en {brand_tone} tono y con el objetivo de {ad_objective}.
+
+---
+
+🔤 **Parte 4: Análisis de texto presente en los anuncios propios**
+- Observá y describí la ubicación, tamaño, estilo y tipografía aproximada del texto presente en los anuncios actuales de la marca.
+- Mantené coherencia visual con estos elementos en las nuevas propuestas.
+- Incluí en cada propuesta un claim publicitario breve en español, junto con el CTA provisto.
+
+---
+
+📦 **Información de la marca:**
+
+- **Nombre de marca:** {brand_name}  
+- **Descripción del producto:** {product_description}  
+- **Colores base:** Primario {primary_color} | Secundario {secondary_color}  
+- **Tono de marca:** {brand_tone}  
+- **Objetivo del anuncio:** {ad_objective}  
+- **CTA deseado:** {cta}  
+- **Descripción visual de anuncios propios:** {own_ads_description}  
+- **Descripción textual de ads de la competencia:** {competitor_ads_description[:800]}
+
+---
+
+🎨 **Instrucciones visuales clave para los prompts que vas a generar:**
+
+- Las imágenes deben parecer **fotografías publicitarias reales** (no arte, ilustración ni render).
+- Mostrá **personas reales usando el producto** o mostrando beneficio claro.
+- Evitá íconos, ilustraciones, monedas, emojis o elementos abstractos.
+- Composición limpia, profesional y actual.
+- Fondos reales, iluminación suave y tonos cálidos.
+- Incluir texto funcional: **un claim atractivo + el CTA definido**, usando la fuente, color y posición analizados.
+- Incluir el logo si es posible, en una posición coherente con los anuncios actuales.
+
+---
+
+📝 **Resultado esperado:**
+
+Devuélveme 3 prompts visuales para DALL·E siguiendo este formato:
+
+### Prompt 1: "[Título del anuncio]"
+[Descripción visual del anuncio en inglés]
+
+### Prompt 2: "[Título del anuncio]"
+[Descripción visual del anuncio en inglés]
+
+### Prompt 3: "[Título del anuncio]"
+[Descripción visual del anuncio en inglés]
+
+Cada descripción debe incluir: escena, entorno, personajes, uso del producto, estilo fotográfico, posición del texto y logo, especificaciones tipográficas (fuente, color, tamaño, posición) y qué texto debe incluir (claim + CTA).  
+
+Acordate: todo debe estar enfocado en performance real, conversión y coherencia visual.
+"""
+    return prompt
+
+
+
+def adapt_prompt_and_extract_proposals(full_text):
+    """
+    Extrae hasta 3 prompts finales para DALL·E generados por GPT-4o en base al nuevo formato estructurado.
+    """
+    import re
     ad_proposals = []
-    
-    # Registrar para debugging
-    print("Extrayendo propuestas de anuncios del texto:")
-    # Mostrar los primeros y últimos 200 caracteres del texto para verificar
-    print(f"Inicio del texto: {full_text[:200]}...")
-    print(f"Final del texto: ...{full_text[-200:]}")
-    
-    # Buscar la sección de Ideas/Propuestas Creativas
-    ideas_section_match = re.search(r'(?:Ideas Creativas|Propuestas Creativas)[^:]*:?\s*(.*?)(?=\n\n[A-Z]|\Z)', 
-                                   full_text, re.DOTALL | re.IGNORECASE)
-    
-    if ideas_section_match:
-        ideas_section = ideas_section_match.group(1)
-        print(f"✅ Sección de propuestas creativas encontrada. Longitud: {len(ideas_section)} caracteres")
-    else:
-        # Si no encontramos la sección específica, usar todo el texto
-        ideas_section = full_text
-        print("⚠️ No se encontró una sección específica de propuestas creativas. Usando todo el texto.")
-    
-    # Primera estrategia: buscar el patrón específico
-    print("\nEstratégia 1: Búsqueda de patrón específico")
-    ad_pattern = r'(?:\*\*)?Anuncio\s+(\d+)(?:\*\*)?:\s*(?:\*\*)?"([^"]+)"(?:\*\*)?.*?(?:\*\*)?Visual(?:\*\*)?:(.*?)(?:\*\*)?Texto Publicitario(?:\*\*)?:(.*?)(?=(?:\*\*)?Anuncio\s+\d+(?:\*\*)?:|$)'
-    
-    ads = re.finditer(ad_pattern, ideas_section, re.DOTALL | re.IGNORECASE)
-    count = 0
-    
-    for ad_match in ads:
-        count += 1
-        ad_number = ad_match.group(1)
-        ad_title = ad_match.group(2).strip()
-        visual_section = ad_match.group(3).strip()
-        text_section = ad_match.group(4).strip()
-        
-        print(f"  Encontrado Anuncio {ad_number}: \"{ad_title}\"")
-        
-        # Limpiar formato markdown y viñetas
-        visual_section = re.sub(r'\*\*|\*', '', visual_section)
-        visual_section = re.sub(r'^\s*[-•*]\s*', '', visual_section, flags=re.MULTILINE)
-        
-        text_section = re.sub(r'\*\*|\*', '', text_section)
-        
-        # Construir un prompt detallado solo con la parte visual
-        prompt = f"Anuncio {ad_number}: \"{ad_title}\"\nDescripción Visual:\n{visual_section}"
-        
+    print("🔍 Procesando prompts generados por GPT...")
+
+    pattern = r"### Prompt (\d+): \"(.*?)\"\n(.*?)(?=\n### Prompt|\Z)"
+    matches = re.finditer(pattern, full_text, re.DOTALL)
+
+    for match in matches:
+        number = match.group(1).strip()
+        title = match.group(2).strip()
+        prompt = match.group(3).strip()
+
         ad_proposals.append({
-            "number": ad_number,
-            "title": ad_title,
-            "visual": visual_section,
-            "text": text_section,
+            "number": number,
+            "title": title,
+            "visual": prompt[:300] + "...",
+            "text": "Texto generado automáticamente basado en el CTA e insights.",
             "prompt": prompt
         })
-    
-    print(f"  Total anuncios encontrados con Estrategia 1: {count}")
-    
-    # Si no encontramos anuncios con el patrón específico, intentamos un enfoque más flexible
-    if not ad_proposals:
-        print("\nEstratégia 2: Búsqueda por secciones")
-        # Buscar secciones que parezcan anuncios (contienen "Visual:" y "Texto Publicitario:")
-        sections = re.split(r'\n\n+', ideas_section)
-        current_ad = None
-        section_count = 0
-        
-        for i, section in enumerate(sections):
-            section_count += 1
-            print(f"  Analizando sección {i+1}/{len(sections)} - Longitud: {len(section)} caracteres")
-            
-            if re.search(r'(?:\*\*)?Anuncio', section, re.IGNORECASE):
-                # Este es el comienzo de un nuevo anuncio
-                title_match = re.search(r'(?:\*\*)?Anuncio[^"]*"([^"]+)"', section, re.IGNORECASE)
-                if title_match:
-                    ad_title = title_match.group(1).strip()
-                    print(f"    Encontrado título de anuncio: \"{ad_title}\"")
-                    current_ad = {
-                        "number": str(len(ad_proposals) + 1),
-                        "title": ad_title,
-                        "visual": "",
-                        "text": "",
-                        "prompt": ""
-                    }
-            
-            if current_ad:
-                if re.search(r'(?:\*\*)?Visual(?:\*\*)?:', section, re.IGNORECASE):
-                    visual_text = re.sub(r'(?:\*\*)?Visual(?:\*\*)?:', '', section, flags=re.IGNORECASE).strip()
-                    current_ad["visual"] = visual_text
-                    print(f"    ✅ Encontrada descripción visual para anuncio \"{current_ad['title']}\"")
-                
-                if re.search(r'(?:\*\*)?Texto Publicitario(?:\*\*)?:', section, re.IGNORECASE):
-                    text_content = re.sub(r'(?:\*\*)?Texto Publicitario(?:\*\*)?:', '', section, flags=re.IGNORECASE).strip()
-                    current_ad["text"] = text_content
-                    print(f"    ✅ Encontrado texto publicitario para anuncio \"{current_ad['title']}\"")
-                    
-                    # Si ya tenemos visual y texto, completamos este anuncio
-                    if current_ad["visual"]:
-                        current_ad["prompt"] = f"Anuncio {current_ad['number']}: \"{current_ad['title']}\"\nDescripción Visual:\n{current_ad['visual']}"
-                        ad_proposals.append(current_ad)
-                        print(f"    ✅ Anuncio \"{current_ad['title']}\" completo y añadido")
-                        current_ad = None
-        
-        print(f"  Total secciones analizadas: {section_count}")
-        print(f"  Total anuncios encontrados con Estrategia 2: {len(ad_proposals)}")
-    
-    # Si aún no tenemos 3 propuestas, intentamos un último método más simple
-    if len(ad_proposals) < 3:
-        print("\nEstratégia 3: Búsqueda simple de anuncios")
-        # Buscar cualquier mención de "Anuncio" y tomar los párrafos siguientes
-        matches = re.finditer(r'(?:\*\*)?Anuncio\s+(\d+)[^"]*"([^"]+)"', ideas_section, re.IGNORECASE)
-        count = 0
-        
-        for match in matches:
-            count += 1
-            ad_number = match.group(1)
-            ad_title = match.group(2).strip()
-            print(f"  Encontrado Anuncio {ad_number}: \"{ad_title}\"")
-            
-            # Verificar si ya tenemos este anuncio
-            existing = any(p for p in ad_proposals if p["title"] == ad_title)
-            if existing:
-                print(f"    ⚠️ Este anuncio ya está en la lista, saltando")
-                continue
-                
-            start_pos = match.end()
-            
-            # Encontrar el final de este anuncio (hasta el siguiente "Anuncio" o fin del texto)
-            next_match = re.search(r'(?:\*\*)?Anuncio\s+\d+', ideas_section[start_pos:], re.IGNORECASE)
-            if next_match:
-                end_pos = start_pos + next_match.start()
-                ad_content = ideas_section[start_pos:end_pos]
-            else:
-                ad_content = ideas_section[start_pos:]
-            
-            # Buscar las secciones visual y texto
-            visual_match = re.search(r'(?:\*\*)?Visual(?:\*\*)?:(.*?)(?:(?:\*\*)?Texto|$)', ad_content, re.DOTALL | re.IGNORECASE)
-            visual_section = visual_match.group(1).strip() if visual_match else ""
-            
-            text_match = re.search(r'(?:\*\*)?Texto Publicitario(?:\*\*)?:(.*?)$', ad_content, re.DOTALL | re.IGNORECASE)
-            text_section = text_match.group(1).strip() if text_match else ""
-            
-            # Si tenemos al menos visual, añadir el anuncio
-            if visual_section:
-                print(f"    ✅ Encontrada descripción visual")
-                if text_section:
-                    print(f"    ✅ Encontrado texto publicitario")
-                
-                # Limpiar formato
-                visual_section = re.sub(r'\*\*|\*', '', visual_section)
-                visual_section = re.sub(r'^\s*[-•*]\s*', '', visual_section, flags=re.MULTILINE)
-                
-                prompt = f"Anuncio {ad_number}: \"{ad_title}\"\nDescripción Visual:\n{visual_section}"
-                
-                ad_proposals.append({
-                    "number": ad_number,
-                    "title": ad_title,
-                    "visual": visual_section,
-                    "text": text_section,
-                    "prompt": prompt
-                })
-                print(f"    ✅ Anuncio añadido a la lista")
-        
-        print(f"  Total anuncios encontrados con Estrategia 3: {count}")
-    
-    # Si aún no tenemos 3 propuestas, intentamos un último enfoque aún más flexible
-    if len(ad_proposals) < 3:
-        print("\nEstratégia 4: Búsqueda básica en todo el texto")
-        # Búsqueda muy básica en todo el texto original
-        anuncio_matches = re.finditer(r'Anuncio\s+\d+[^"]*"([^"]+)"', full_text, re.IGNORECASE)
-        
-        for match in anuncio_matches:
-            ad_title = match.group(1).strip()
-            
-            # Verificar si ya tenemos este anuncio
-            existing = any(p for p in ad_proposals if p["title"] == ad_title)
-            if existing:
-                continue
-                
-            # Si no hemos llegado a 3 propuestas, crear una simple con lo que tenemos
-            if len(ad_proposals) < 3:
-                ad_number = str(len(ad_proposals) + 1)
-                print(f"  Creando anuncio básico {ad_number}: \"{ad_title}\"")
-                
-                # Tomar 500 caracteres después del título como descripción
-                start_pos = match.end()
-                visual_section = full_text[start_pos:start_pos + 500].strip()
-                
-                # Intentar limpiar y extraer solo la parte visual
-                visual_match = re.search(r'Visual:(.*?)(?:Texto|$)', visual_section, re.DOTALL | re.IGNORECASE)
-                if visual_match:
-                    visual_section = visual_match.group(1).strip()
-                
-                prompt = f"Anuncio {ad_number}: \"{ad_title}\"\nDescripción Visual:\n{visual_section}"
-                
-                ad_proposals.append({
-                    "number": ad_number,
-                    "title": ad_title,
-                    "visual": visual_section,
-                    "text": "",
-                    "prompt": prompt
-                })
-                print(f"    ✅ Anuncio básico añadido")
-    
-    # Generar propuestas artificiales si no tenemos 3
+
+        if len(ad_proposals) == 3:
+            break
+
     while len(ad_proposals) < 3:
-        ad_number = str(len(ad_proposals) + 1)
-        print(f"\n⚠️ Generando propuesta artificial #{ad_number} porque no se encontraron suficientes")
-        
-        # Crear una propuesta artificial
-        artificial_proposal = {
-            "number": ad_number,
-            "title": f"Propuesta Creativa {ad_number}",
-            "visual": "Un anuncio que muestra el logo de la marca en primer plano, con elementos visuales que representan los beneficios del producto.",
-            "text": "Texto publicitario que destaca los beneficios principales del producto.",
-            "prompt": f"Anuncio {ad_number}: \"Propuesta Creativa {ad_number}\"\nDescripción Visual:\nUn anuncio que muestra el logo de la marca en primer plano, con elementos visuales que representan los beneficios del producto."
-        }
-        
-        ad_proposals.append(artificial_proposal)
-    
-    print(f"\n✅ RESULTADO FINAL: {len(ad_proposals)} propuestas extraídas")
-    for i, prop in enumerate(ad_proposals):
-        print(f"  Propuesta {i+1}: {prop['title']}")
-    
-    # Asegurar que tenemos exactamente 3 propuestas
-    return ad_proposals[:3]
+        idx = len(ad_proposals) + 1
+        ad_proposals.append({
+            "number": str(idx),
+            "title": f"Propuesta {idx}",
+            "visual": "Generic visual description placeholder",
+            "text": "Default CTA",
+            "prompt": (
+                "Design a clean and professional ad. Use brand colors. Show a real person using the app. "
+                "Avoid illustrations, icons, or abstract visuals. This must resemble a real Meta or TikTok ad."
+            )
+        })
+
+    print(f"✅ Se generaron {len(ad_proposals)} prompts para DALL·E.")
+    return ad_proposals
 
 
-
-# Reemplaza la función get_openai_insights_and_images completa con esta versión
 
 def get_openai_insights_and_images(df_ads, brand_info, OPENAI_API_KEY, ASSISTANT_ID):
-    """Generar insights y propuestas creativas + imágenes nuevas usando OpenAI y DALL·E."""
+    """Generar insights + propuestas creativas e imágenes diseñadas como anuncios de performance real."""
     try:
+        import os, time, openai, streamlit as st
+
         client = openai.OpenAI(api_key=OPENAI_API_KEY)
         thread = client.beta.threads.create()
 
-        # Extraer imágenes del competidor - solo usamos URLs para evitar problemas
-        competitor_image_urls = [url for url in df_ads["Image URL"].dropna().tolist() if url.startswith("http")]
-        competitor_image_urls = competitor_image_urls[:3]  # Limitamos a 3 para evitar sobrecarga
-        
-        # Preparar información de la marca
+        # Datos de la marca
+        competitor_image_urls = [url for url in df_ads["Image URL"].dropna().tolist() if url.startswith("http")][:3]
         brand_name = brand_info.get("brand_name", "")
         brand_description = brand_info.get("brand_description", "")
         brand_colors = brand_info.get("brand_colors", [])
+        primary_color = brand_colors[0][1] if brand_colors else "#000000"
+        secondary_color = brand_colors[1][1] if len(brand_colors) > 1 else "#333333"
         colors_text = ", ".join([f"{name}: {code}" for name, code in brand_colors])
-        
-        # Obtener rutas de anuncios propios si existen
-        own_ads_paths = brand_info.get("own_ads_paths", [])
-        # Filtrar solo los que existen en el sistema
-        own_ads_valid_paths = [path for path in own_ads_paths if os.path.exists(path)]
-        
-        # Obtener ruta del logo de la marca
         logo_path = brand_info.get("logo_path")
         has_logo = logo_path and os.path.exists(logo_path)
+        own_ads_paths = [p for p in brand_info.get("own_ads_paths", []) if os.path.exists(p)]
 
-        # Crear el prompt solo con el texto, incluyendo descripciones de las imágenes
-        # en lugar de enviar las imágenes directamente (para evitar problemas con la API)
-        prompt_text = (
-            "Eres un experto en creatividad publicitaria. Analiza estos anuncios de un competidor "
-            "y genera insights + propuestas visuales creativas superadoras para una marca.\n\n"
-            f"📊 INFORMACIÓN DE LA MARCA DEL CLIENTE:\n"
-            f"- Nombre: {brand_name}\n"
-            f"- Descripción: {brand_description}\n"
-            f"- Paleta de colores: {colors_text}\n"
-        )
-        
-        # Añadir información sobre el logo
-        if has_logo:
-            prompt_text += (
-                f"- La marca tiene un logo oficial que debe ser incluido en todas las propuestas creativas. "
-                f"Es un elemento esencial de su identidad visual.\n"
-            )
-            
-        # Añadir información sobre anuncios propios si existen
-        if own_ads_valid_paths:
-            prompt_text += (
-                f"- La marca tiene {len(own_ads_valid_paths)} anuncios actuales. "
-                f"Para tus propuestas, mejora su enfoque actual manteniendo coherencia con su identidad visual.\n"
-            )
-            
-        prompt_text += (
-            f"\n📊 INFORMACIÓN DEL COMPETIDOR:\n"
-            f"- Total anuncios analizados: {len(df_ads)}\n"
-            f"- Textos ejemplo: {' '.join(df_ads['Ad Text'].dropna().unique())[:1500]}\n\n"
-            "📋 INSTRUCCIONES:\n"
-            "1. Da insights sobre el estilo, tono, plataformas, patrones visuales y mensajes del COMPETIDOR.\n"
-            "2. Analiza cómo la marca del CLIENTE puede diferenciarse positivamente.\n"
-        )
-        
-        # Si hay anuncios propios, pedir que analice también esos
-        if own_ads_valid_paths:
-            prompt_text += (
-                "2.5 Sugiere mejoras sobre el enfoque actual de la marca para potenciar su impacto.\n"
-            )
-            
-        prompt_text += (
-            "3. Propón 3 ideas creativas para nuevos anuncios que:\n"
-            "   - Respeten la paleta de colores del cliente\n"
-            "   - Sean coherentes con su identidad de marca\n"
-            "   - Ofrezcan una propuesta de valor superior a la competencia\n"
-            "   - IMPORTANTE: Incluyan el logo de la marca en un lugar visible y adecuado\n"
-            "   - Incluyan una descripción visual detallada y un texto publicitario sugerido\n\n"
-            "IMPORTANTE: Para cada idea creativa, usa EXACTAMENTE este formato:\n"
-            "**Anuncio 1: \"[Título del anuncio]\"**\n"
-            "**Visual:** [Descripción detallada de todos los elementos visuales del anuncio, incluyendo ESPECÍFICAMENTE "
-            "dónde y cómo se ubicará el logo de la marca]\n"
-            "**Texto Publicitario:** [Texto propuesto para el anuncio]\n\n"
-            "Sigue el mismo formato para Anuncio 2 y Anuncio 3."
+        # Crear prompt inicial con estrategia definida
+        prompt_text = generate_prompt_1_gpt4o(
+            brand_name=brand_name,
+            product_description=brand_description,
+            primary_color=primary_color,
+            secondary_color=secondary_color,
+            brand_tone=brand_info.get("brand_tone", "Moderno y funcional"),
+            ad_objective=brand_info.get("ad_objective", "Mostrar el uso de la app en un entorno cotidiano"),
+            cta=brand_info.get("cta", "Usa la app"),
+            own_ads_description=brand_info.get("own_ads_description", "Incluye referencias visuales a continuación."),
+            competitor_ads_description=" ".join(df_ads['Ad Text'].dropna().unique())[:1000]
         )
 
-        # Crear mensaje solo con el texto primero
-        client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content=[{"type": "text", "text": prompt_text}]
-        )
+        client.beta.threads.messages.create(thread_id=thread.id, role="user", content=[{"type": "text", "text": prompt_text}])
 
-        # Solo enviar URLs de competidores que sabemos que funcionan
+        # Enviar imágenes de anuncios actuales
+        if own_ads_paths:
+            client.beta.threads.messages.create(thread_id=thread.id, role="user", content=[{"type": "text", "text": "Referencias visuales de anuncios actuales de la marca:"}])
+            for path in own_ads_paths[:3]:
+                file_upload = client.files.create(file=open(path, "rb"), purpose="vision")
+                client.beta.threads.messages.create(
+                    thread_id=thread.id,
+                    role="user",
+                    content=[{"type": "image_file", "image_file": {"file_id": file_upload.id}}]
+                )
+
+        # Enviar imágenes de la competencia
         if competitor_image_urls:
-            try:
-                # Crear un mensaje con las URLs de las imágenes de la competencia
-                competitor_message = []
-                for url in competitor_image_urls[:3]:  # Limitamos a 3 URLs
-                    if url and url.startswith("http"):
-                        competitor_message.append({"type": "image_url", "image_url": {"url": url}})
-                
-                if competitor_message:  # Si tenemos al menos una imagen
-                    # Primero enviamos un mensaje de texto explicativo
-                    client.beta.threads.messages.create(
-                        thread_id=thread.id,
-                        role="user",
-                        content=[{"type": "text", "text": "Estos son algunos anuncios de la competencia:"}]
-                    )
-                    
-                    # Luego enviamos las imágenes una por una
-                    for img_content in competitor_message:
-                        client.beta.threads.messages.create(
-                            thread_id=thread.id,
-                            role="user",
-                            content=[img_content]
-                        )
-                    
-                    print(f"✅ Se enviaron {len(competitor_message)} imágenes de la competencia")
-            except Exception as e:
-                print(f"Error enviando imágenes de competidores: {e}")
-                # Continuamos incluso si hay error en las imágenes
+            client.beta.threads.messages.create(thread_id=thread.id, role="user", content=[{"type": "text", "text": "Referencias visuales de la competencia:"}])
+            for url in competitor_image_urls:
+                client.beta.threads.messages.create(
+                    thread_id=thread.id,
+                    role="user",
+                    content=[{"type": "image_url", "image_url": {"url": url}}]
+                )
 
-        # Ejecutar el análisis
-        run = client.beta.threads.runs.create(
-            thread_id=thread.id,
-            assistant_id=ASSISTANT_ID
-        )
-
-        with st.spinner("🔄 Analizando anuncios y generando propuestas adaptadas a tu marca..."):
+        run = client.beta.threads.runs.create(thread_id=thread.id, assistant_id=ASSISTANT_ID)
+        with st.spinner("🧠 Analizando y generando prompts visuales..."):
             while run.status != "completed":
                 time.sleep(2)
                 run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
 
-        # Obtener respuesta de texto
         messages = client.beta.threads.messages.list(thread_id=thread.id)
         full_text = messages.data[0].content[0].text.value
+        ad_proposals = adapt_prompt_and_extract_proposals(full_text)
 
-        # Extraer propuestas de anuncios usando la nueva función
-        ad_proposals = extract_ad_proposals(full_text)
-        
-        # Generar imágenes con DALL·E basadas en las propuestas visuales específicas
         image_responses = []
-        
-        if ad_proposals:
-            # Asegurar que tenemos exactamente 3 propuestas
-            proposals_to_process = ad_proposals[:3]
-            
-            # Imprimir información sobre las propuestas para debugging
-            print(f"\nGenerando imágenes para {len(proposals_to_process)} propuestas:")
-            for i, prop in enumerate(proposals_to_process):
-                print(f"  Propuesta {i+1}: {prop['title']}")
-            
-            for i, proposal in enumerate(proposals_to_process):
-                with st.spinner(f"Generando imagen {i+1} para '{proposal['title']}'..."):
-                    try:
-                        # Construir un prompt mejorado para DALL-E que incluya:
-                        # 1. El nombre de la marca
-                        # 2. La paleta de colores
-                        # 3. La solicitud explícita de incluir el logo
-                        # 4. La descripción visual específica de la propuesta
-                        
-                        logo_instruction = ""
-                        if has_logo:
-                            logo_instruction = f"The ad MUST prominently include the {brand_name} logo. "
-                        
-                        enhanced_prompt = (
-                            f"Create a professional advertisement for {brand_name} brand using their color palette ({colors_text}). "
-                            f"{logo_instruction}"
-                            f"This is for a paid media campaign where brand visibility is crucial. "
-                            f"{proposal['prompt']}"
-                        )
-                        
-                        print(f"\nGenerando imagen {i+1} con DALL-E...")
-                        print(f"Prompt: {enhanced_prompt[:200]}...")
-                        
-                        image = client.images.generate(
-                            model="dall-e-3",
-                            prompt=enhanced_prompt,
-                            n=1,
-                            size="1024x1024"
-                        )
-                        image_url = image.data[0].url
-                        print(f"✅ Imagen {i+1} generada con éxito: {image_url[:60]}...")
-                        
-                        image_responses.append({
-                            "title": proposal['title'],
-                            "prompt": enhanced_prompt,
-                            "url": image_url,
-                            "description": proposal['visual'],
-                            "ad_text": proposal['text']
-                        })
-                    except Exception as img_error:
-                        error_msg = str(img_error)
-                        print(f"❌ Error generando imagen {i+1}: {error_msg}")
-                        st.error(f"Error generando imagen {i+1}: {error_msg}")
-                        
-                        # Añadir un placeholder en lugar de la imagen fallida
-                        image_responses.append({
-                            "title": proposal['title'],
-                            "prompt": enhanced_prompt if 'enhanced_prompt' in locals() else "No disponible",
-                            "url": "https://placehold.co/600x400/1E90FF/FFFFFF?text=Error+al+generar+imagen",
-                            "description": proposal['visual'],
-                            "ad_text": proposal['text'],
-                            "error": error_msg
-                        })
-            
-            print(f"Total de imágenes generadas: {len(image_responses)}")
-        else:
-            print("⚠️ No se encontraron propuestas para generar imágenes")
-            
-        # Asegurar que tenemos exactamente 3 respuestas
+        for i, proposal in enumerate(ad_proposals[:3]):
+            with st.spinner(f"🎨 Generando imagen {i+1} - {proposal['title']}"):
+                try:
+                    final_prompt = proposal['prompt']
+
+                    image = client.images.generate(
+                        model="dall-e-3",
+                        prompt=final_prompt,
+                        n=1,
+                        size="1024x1024"
+                    )
+                    image_url = image.data[0].url
+
+                    image_responses.append({
+                        "title": proposal['title'],
+                        "prompt": final_prompt,
+                        "url": image_url,
+                        "description": proposal['visual'],
+                        "ad_text": proposal['text']
+                    })
+                except Exception as img_error:
+                    error_msg = str(img_error)
+                    st.error(f"Error generando imagen: {error_msg}")
+                    image_responses.append({
+                        "title": proposal['title'],
+                        "prompt": final_prompt,
+                        "url": "https://placehold.co/600x400/1E90FF/FFFFFF?text=Error+al+generar+imagen",
+                        "description": proposal['visual'],
+                        "ad_text": proposal['text'],
+                        "error": error_msg
+                    })
+
         while len(image_responses) < 3:
-            missing_idx = len(image_responses) + 1
-            print(f"⚠️ Faltan imágenes, añadiendo placeholder #{missing_idx}")
-            
+            idx = len(image_responses) + 1
             image_responses.append({
-                "title": f"Propuesta {missing_idx}",
+                "title": f"Propuesta {idx}",
                 "prompt": "No disponible",
-                "url": "https://placehold.co/600x400/1E90FF/FFFFFF?text=Propuesta+no+disponible",
-                "description": "No se pudo extraer esta propuesta del análisis.",
-                "ad_text": "No disponible"
+                "url": "https://placehold.co/600x400/AAAAAA/FFFFFF?text=Propuesta+no+disponible",
+                "description": "No se pudo generar.",
+                "ad_text": "N/A"
             })
 
-        # Devolver los resultados
         return {
             "insights_text": full_text,
             "creative_images": image_responses,
-            "proposals": ad_proposals if ad_proposals else []
+            "proposals": ad_proposals
         }
 
     except Exception as e:
-        st.error(f"Error durante el análisis y generación de imágenes: {e}")
+        st.error(f"Error: {e}")
         return f"Error: {e}"
 
+
+####################################################################################
 
 # Inicializar session_state si no existe
 if 'advertisers' not in st.session_state:

@@ -448,7 +448,7 @@ def extract_ads(country_code, selected_advertiser):
                 break
             last_height = new_height
         
-        ads = driver.find_elements(By.XPATH, "//div[contains(@class, '_7jvw x2izyaf x1hq5gj4 x1d52u69')]")
+        ads = driver.find_elements(By.XPATH, "//div[contains(@class, 'x1plvlek xryxfnj x1gzqxud x178xt8z')]")
         
         for index, ad in enumerate(ads):
             try:
